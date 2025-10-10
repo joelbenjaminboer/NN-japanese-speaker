@@ -1,0 +1,32 @@
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "japanese_speaker_recognition"
+version = "0.0.1"
+description = "This project develops a machine learning classifier to identify one of nine japanese male speakers based on short 12-channel time-series recordings of the vowel /ae/."
+authors = [
+  { name = "Team 10" },
+]
+
+readme = "README.md"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    
+]
+requires-python = "~=3.10.0"
+
+
+[tool.ruff]
+line-length = 99
+src = ["japanese_speaker_recognition"]
+include = ["pyproject.toml", "japanese_speaker_recognition/**/*.py"]
+
+[tool.ruff.lint]
+extend-select = ["I"]  # Add import sorting
+
+[tool.ruff.lint.isort]
+known-first-party = ["japanese_speaker_recognition"]
+force-sort-within-sections = true
+
