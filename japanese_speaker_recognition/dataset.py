@@ -1,9 +1,10 @@
-import os
-import numpy as np
 from pathlib import Path
-from urllib.request import urlretrieve
-from sklearn.preprocessing import StandardScaler
 from typing import List, Tuple
+from urllib.request import urlretrieve
+
+import numpy as np
+from sklearn.preprocessing import StandardScaler
+
 import japanese_speaker_recognition.config as cfg
 
 
@@ -59,7 +60,6 @@ def read_utterances(filename: str) -> List[np.ndarray]:
     return utterances
 
 
-
 def generate_labels(num_speakers=9, utterances_per_speaker=30) -> np.ndarray:
     """
     Generate speaker labels for the training set.
@@ -102,29 +102,22 @@ def normalize_train_test(X_train: np.ndarray, X_test: np.ndarray) -> Tuple[np.nd
     X_test_norm = scaler.transform(X_test_2d).reshape(X_test.shape[0], X_test.shape[1], f)
     return X_train_norm, X_test_norm
 
+
 if __name__ == "__main__":
     download_if_missing()
 
-    print("Reading training data...")
     train_utts = read_utterances(cfg.TRAIN_FILE)
     print(f"Loaded {len(train_utts)} train utterances.")
-
-    print("Reading test data...")
     test_utts = read_utterances(cfg.TEST_FILE)
     print(f"Loaded {len(test_utts)} test utterances.")
 
-    print("Padding sequences...")
     X_train, len_train = pad_sequences(train_utts, cfg.MAX_LEN)
     X_test, len_test = pad_sequences(test_utts, cfg.MAX_LEN)
 
-    print("Generating labels...")
     y_train = generate_labels()
     y_test = np.full(len(test_utts), -1)
 
-    print("Normalizing features...")
     X_train, X_test = normalize_train_test(X_train, X_test)
-
-    print("Saving preprocessed data separately...")
 
     # --- Save train data ---
     np.savez_compressed(
@@ -143,6 +136,3 @@ if __name__ == "__main__":
         len_test=len_test,
     )
     print(f"Saved test data to {cfg.OUTPUT_DIR / 'test_data.npz'}")
-
-    print("Preprocessing complete!")
-
