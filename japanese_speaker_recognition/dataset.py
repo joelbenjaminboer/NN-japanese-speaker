@@ -60,7 +60,7 @@ def read_utterances(filename: str) -> List[np.ndarray]:
     return utterances
 
 
-def generate_labels(num_speakers=9, utterances_per_speaker=30) -> np.ndarray:
+def generate_train_labels(num_speakers=9, utterances_per_speaker=30) -> np.ndarray:
     """
     Generate speaker labels for the training set.
     There are 9 speakers with 30 utterances each in training.
@@ -68,6 +68,17 @@ def generate_labels(num_speakers=9, utterances_per_speaker=30) -> np.ndarray:
     labels = []
     for speaker_id in range(num_speakers):
         labels += [speaker_id] * utterances_per_speaker
+    return np.array(labels, dtype=int)
+
+
+def generate_test_labels() -> np.ndarray:
+    """
+    Generate speaker labels for the test set based on the known block sizes.
+    """
+    block_sizes = [31, 35, 88, 44, 29, 24, 40, 50, 29]  # per speaker 1–9
+    labels = []
+    for speaker_id, n in enumerate(block_sizes):
+        labels += [speaker_id] * n
     return np.array(labels, dtype=int)
 
 
@@ -114,8 +125,8 @@ if __name__ == "__main__":
     X_train, len_train = pad_sequences(train_utts, cfg.MAX_LEN)
     X_test, len_test = pad_sequences(test_utts, cfg.MAX_LEN)
 
-    y_train = generate_labels()
-    y_test = np.full(len(test_utts), -1)
+    y_train = generate_train_labels()
+    y_test = generate_test_labels()
 
     X_train, X_test = normalize_train_test(X_train, X_test)
 
