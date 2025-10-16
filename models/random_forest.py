@@ -25,18 +25,19 @@ class RandomForestWrapper:
         self.is_trained = False
 
     @staticmethod
-    def load_npz(train_path: str, test_path: str):
-        """
-        Load preprocessed train and test .npz files.
-        Returns X_train, y_train, X_test, y_test.
-        """
-        train = np.load(train_path)
-        test = np.load(test_path)
-        X_train, y_train = train["X_train"], train["y_train"]
-        X_test, y_test = test["X_test"], test["y_test"]
+    def load_npz(train_file, test_file):
+        train = np.load(train_file)
+        test = np.load(test_file)
 
-        print(f"Loaded data:\n"
-              f"  Train: {X_train.shape}, Test: {X_test.shape}")
+        # Handle either normal or augmented naming
+        if "X_train" in train:
+            X_train, y_train = train["X_train"], train["y_train"]
+        elif "X_augmented" in train:
+            X_train, y_train = train["X_augmented"], train["y_augmented"]
+        else:
+            raise KeyError("No valid X/y keys found in training file")
+
+        X_test, y_test = test["X_test"], test["y_test"]
         return X_train, y_train, X_test, y_test
 
     @staticmethod

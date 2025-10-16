@@ -6,6 +6,7 @@ import numpy as np
 from sklearn.preprocessing import StandardScaler
 
 import japanese_speaker_recognition.config as cfg
+import japanese_speaker_recognition.data_augmentation as data_aug
 
 
 # ---------------------------------------------------------------------
@@ -129,6 +130,28 @@ if __name__ == "__main__":
     y_test = generate_test_labels()
 
     X_train, X_test = normalize_train_test(X_train, X_test)
+
+    # --- Data Augmentation ---
+    if cfg.AUGMENTATION:
+        n = 500
+        augmented_datasets = []
+        for _ in range(n):
+            X_aug = data_aug.add_gaussian_noise(X_train)
+            X_aug = data_aug.random_scaling(X_aug)
+            X_aug = data_aug.time_masking(X_aug)
+            X_aug = data_aug.frequency_masking(X_aug)
+            augmented_datasets.append(X_aug)
+
+        X_augmented = np.vstack(augmented_datasets)
+        y_augmented = np.tile(y_train, n)
+
+        # -- Save augmented data ---
+        np.savez_compressed(
+            cfg.OUTPUT_DIR / "augmented_data.npz",
+            X_augmented=X_augmented,
+            y_augmented=y_augmented,
+        )
+        print(f"Saved augmented data to {cfg.OUTPUT_DIR / 'augmented_data.npz'}")
 
     # --- Save train data ---
     np.savez_compressed(
