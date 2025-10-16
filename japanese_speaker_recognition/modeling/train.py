@@ -1,5 +1,5 @@
 from pathlib import Path
-import numpy as np
+
 from models.random_forest import RandomForestWrapper
 
 if __name__ == "__main__":
