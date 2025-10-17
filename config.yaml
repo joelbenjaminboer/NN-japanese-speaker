@@ -1,0 +1,32 @@
+DATA_URL: "https://archive.ics.uci.edu/ml/machine-learning-databases/JapaneseVowels/"
+
+
+PIPELINE: # Change these for the pipeline
+  TRAIN: True
+  TEST: False
+
+MAX_LEN: 29  # longest utterance length (7–29)
+N_FEATURES: 12
+
+AUGMENTATION:
+  AUGMENT: true
+  REPEATS: 100
+  AUG_FILE: "data/augmented_data.npz"
+  SEED: 42
+  STEPS:
+    - type: gaussian_noise
+      noise_factor: 0.001
+      p: 1.0
+    - type: random_scaling
+      scale_range: [0.95, 1.05]
+    - type: time_masking
+      max_mask_percentage: 0.01
+    # - type: frequency_masking
+    #   max_mask_percentage: 0.01
+
+INPUT_DIRS:
+  TRAIN_FILE: "data/ae.train"
+  TEST_FILE: "data/ae.test"
+
+OUTPUT_DIRS:
+  PROCESSED: "data/processed_data"
