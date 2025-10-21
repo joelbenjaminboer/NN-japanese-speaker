@@ -69,7 +69,7 @@ class Pipeline:
             ) from exc
         xv = self._apply_transforms(split.x_valid if split.x_valid is not None else split.x_test)
         yv = split.y_valid if split.y_valid is not None else split.y_test
-        return metric(xv, yv, metric)
+        return self.model.score(xv, yv, metric)
 
     def predict(self, x: ndarray) -> ndarray:
         x = self._apply_transforms(x)
