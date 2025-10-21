@@ -40,13 +40,13 @@ install-dev:
 
 ## Lint using ruff (no modifications)
 .PHONY: lint
-lint:
+lint: install-tools
 	uv run ruff format --check $(RUFF_FORMAT_OPTS) $(SRC)
 	uv run ruff check $(RUFF_CHECK_OPTS) $(SRC)
 
 ## Auto-fix with ruff
 .PHONY: format
-format:
+format: install-tools
 	uv run ruff check --fix $(RUFF_CHECK_OPTS) $(SRC)
 	uv run ruff format $(RUFF_FORMAT_OPTS) $(SRC)
 
@@ -58,6 +58,12 @@ typecheck:
 ## All checks
 .PHONY: check
 check: lint typecheck
+
+.PHONY: install-tools
+install-tools:
+	uv add pre-commit
+	uv add ruff
+	uv add mypy
 
 ## Pre-commit (installed in the .venv, runs with uv)
 .PHONY: pre-commit
