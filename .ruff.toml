@@ -7,5 +7,4 @@ ignore = ["E203"]
 
 [format]
 quote-style = "double"
-indent-style = "tab"
-
+indent-style = "space"
