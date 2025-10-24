@@ -16,6 +16,16 @@ classifiers = [
     
 ]
 requires-python = "~=3.11.5"
+dependencies = [
+    "basedpyright>=1.31.7",
+    "joblib>=1.5.2",
+    "mypy>=1.18.2",
+    "numpy>=2.3.4",
+    "pre-commit>=4.3.0",
+    "pyyaml>=6.0.3",
+    "ruff>=0.14.1",
+    "scikit-learn>=1.7.2",
+]
 
 
 [tool.ruff]
