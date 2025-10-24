@@ -6,7 +6,6 @@ import numpy as np
 from sklearn.preprocessing import StandardScaler
 
 import japanese_speaker_recognition.config as cfg
-import japanese_speaker_recognition.data_augmentation as data_aug
 
 
 # ---------------------------------------------------------------------
@@ -61,7 +60,7 @@ def read_utterances(filename: str) -> List[np.ndarray]:
     return utterances
 
 
-def generate_train_labels(num_speakers=9, utterances_per_speaker=30) -> np.ndarray:
+def generate_labels(num_speakers=9, utterances_per_speaker=30) -> np.ndarray:
     """
     Generate speaker labels for the training set.
     There are 9 speakers with 30 utterances each in training.
@@ -69,17 +68,6 @@ def generate_train_labels(num_speakers=9, utterances_per_speaker=30) -> np.ndarr
     labels = []
     for speaker_id in range(num_speakers):
         labels += [speaker_id] * utterances_per_speaker
-    return np.array(labels, dtype=int)
-
-
-def generate_test_labels() -> np.ndarray:
-    """
-    Generate speaker labels for the test set based on the known block sizes.
-    """
-    block_sizes = [31, 35, 88, 44, 29, 24, 40, 50, 29]  # per speaker 1–9
-    labels = []
-    for speaker_id, n in enumerate(block_sizes):
-        labels += [speaker_id] * n
     return np.array(labels, dtype=int)
 
 
@@ -126,32 +114,10 @@ if __name__ == "__main__":
     X_train, len_train = pad_sequences(train_utts, cfg.MAX_LEN)
     X_test, len_test = pad_sequences(test_utts, cfg.MAX_LEN)
 
-    y_train = generate_train_labels()
-    y_test = generate_test_labels()
+    y_train = generate_labels()
+    y_test = np.full(len(test_utts), -1)
 
     X_train, X_test = normalize_train_test(X_train, X_test)
-
-    # --- Data Augmentation ---
-    if cfg.AUGMENTATION:
-        n = 500
-        augmented_datasets = []
-        for _ in range(n):
-            X_aug = data_aug.add_gaussian_noise(X_train)
-            X_aug = data_aug.random_scaling(X_aug)
-            X_aug = data_aug.time_masking(X_aug)
-            X_aug = data_aug.frequency_masking(X_aug)
-            augmented_datasets.append(X_aug)
-
-        X_augmented = np.vstack(augmented_datasets)
-        y_augmented = np.tile(y_train, n)
-
-        # -- Save augmented data ---
-        np.savez_compressed(
-            cfg.OUTPUT_DIR / "augmented_data.npz",
-            X_augmented=X_augmented,
-            y_augmented=y_augmented,
-        )
-        print(f"Saved augmented data to {cfg.OUTPUT_DIR / 'augmented_data.npz'}")
 
     # --- Save train data ---
     np.savez_compressed(
