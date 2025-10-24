@@ -38,7 +38,7 @@ class AddGaussianNoise(Transform):
     def apply(self, x: Array3D, rng: np.random.Generator | None = None) -> Array3D:
         rng = rng or np.random.default_rng()
         noise = rng.normal(0.0, self.noise_factor, size=x.shape)
-        return x + noise  # no mutation
+        return x + noise
 
 
 @dataclass(frozen=True)
@@ -49,7 +49,7 @@ class RandomScaling(Transform):
     def apply(self, x: Array3D, rng: np.random.Generator | None = None) -> Array3D:
         rng = rng or np.random.default_rng()
         scale = rng.uniform(*self.scale_range)
-        return x * scale  # no mutation
+        return x * scale
 
 
 @dataclass(frozen=True)
