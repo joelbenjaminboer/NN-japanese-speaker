@@ -1,88 +1,123 @@
-from nomic import embed
+import time
+
 import numpy as np
+from nomic import embed
 
-class add_time_series_to_embedding:
-    def __init__(self, model_name: str = "nomic-embed-text-v1.5", timeseries: list[list[float]] = None):
-        self.model = model_name
-        self.original_timeseries = timeseries
-        self.processed_timeseries = self._preprocess_timeseries(timeseries)
-        self.embeddings = self._embed(self.processed_timeseries)
-        self.fused = self._fuse_embeddings_timeseries()
 
-    @staticmethod
-    def _preprocess_timeseries(self, time_series: list[list[float]], precision: int = 2) -> list[str]:
+class EmbeddingPipeline:
+    def __init__(
+        self,
+        timeseries: list[np.ndarray],
+        model_name: str = "nomic-embed-text-v1.5",
+        dimension: int = 64,
+        precision: int = 2,
+    ) -> None:
         """
-        Convert a multi-channel time series (list of channels) into digit-tokenized format
-        described in Gruver et al. (2024). Each channel is tokenized separately.
+        Embedding pipeline for a list of utterances (each np.ndarray of shape (12, T_i)).
+        Converts each utterance to a digit-tokenized representation,
+        embeds each channel, and fuses embeddings with original data.
+        """
+        if not isinstance(timeseries, list):
+            raise ValueError("Expected list of np.ndarray, each shaped (12, T_i)")
 
-        Input shape:  [n_channels][n_timesteps]
-        Output shape: [n_channels]  (each entry is a comma-separated token string)
+        self.model = model_name
+        self.dimension = dimension
+        self.precision = precision
+        self.original_timeseries = timeseries
 
-        Example:
-            Input:
-                [
-                    [0.645, 6.45, 64.5, 645.0],  # channel 1
-                    [1.23, 12.3, 123.0, 1230.0]  # channel 2
-                ]
+        # Run the embedding pipeline
+        self.processed_timeseries = [self._preprocess_timeseries(utt) for utt in timeseries]
+        self.embeddings = self._embed(self.processed_timeseries)
+        self.fused = [
+            self._fuse_embeddings_timeseries(utt, emb)
+            for utt, emb in zip(timeseries, self.embeddings, strict=True)
+        ]
 
-            Output:
-                [
-                    "6 4 , 6 4 5 , 6 4 5 0 , 6 4 5 0 0",
-                    "1 2 3 , 1 2 3 0 , 1 2 3 0 0 , 1 2 3 0 0 0"
-                ]
+    # -----------------------------
+    # Step 1: preprocessing
+    # -----------------------------
+    def _preprocess_timeseries(self, utterance: np.ndarray) -> list[str]:
+        """
+        Converts a single utterance (12 x T) into digit-tokenized text per channel.
         """
         processed_channels = []
-        for channel in time_series:
+        for channel in utterance:
             channel_tokens = []
             for value in channel:
-                scaled = int(round(value * (10 ** precision)))
+                scaled = int(round(value * (10**self.precision)))
                 digits = " ".join(list(str(scaled)))
                 channel_tokens.append(digits)
             processed_channels.append(" , ".join(channel_tokens))
         return processed_channels
 
-    @staticmethod
-    def _embed(self, texts: list[str], dimension: int = 64) -> list[list[float]]:
+    # -----------------------------
+    # Step 2: embedding
+    # -----------------------------
+    def _embed(self, processed_utterances: list[list[str]]) -> list[np.ndarray]:
         """
-        Embeds the preprocessed time series text using a large language model.
-        args:
-            texts: List of preprocessed time series strings.
-        returns:
-            List of embeddings corresponding to each input text.
-            list[list[float_channel_1], list[float_channel 2], ...]
+        Efficient batched embedding with automatic rate-limit handling.
+        Splits requests into manageable chunks and retries on 429 responses.
         """
-        if texts is None:
-            raise ValueError("Input texts for embedding cannot be None.")
-        
-        embeddings = embed.text(
-            texts=texts,
-            model=self.model,
-            task_type='classification',
-            dimensionality=dimension,
-        )
-        
-        return np.array(embeddings['embeddings'], dtype=float)
-    
-    @staticmethod
-    def _fuse_embeddings_timeseries(self) -> np.ndarray:
-        """
-        Fuses raw time series (n_channels x n_timesteps)
-        with embeddings (n_channels x embedding_dim)
-        using element-wise addition and zero padding
-        for dimensional consistency.
+        # Flatten list of utterance-channel strings
+        all_texts = [text for utt in processed_utterances for text in utt]
+        n_utts = len(processed_utterances)
+        n_channels = len(processed_utterances[0])
 
-        Returns:
-            fused (np.ndarray): fused representation of shape (n_channels, max(n_timesteps, embedding_dim))
-        """
-        if self.original_timeseries is None or self.embeddings is None:
-            raise ValueError("Original timeseries or embeddings not initialized.")
+        all_embs = []
+        batch_size = 100  # <= recommended by Nomic
+        for i in range(0, len(all_texts), batch_size):
+            chunk = all_texts[i : i + batch_size]
 
-        ts = np.array(self.original_timeseries, dtype=float)
-        emb = np.array(self.embeddings, dtype=float)
+            # Retry loop with exponential backoff
+            for attempt in range(5):
+                try:
+                    print(
+                        f"Embedding chunk {i // batch_size + 1}/{-(-len(all_texts) // batch_size)} "
+                        f"({len(chunk)}"
+                    )
+                    response = embed.text(
+                        texts=chunk,
+                        model=self.model,
+                        dimensionality=self.dimension,
+                    )
+                    emb = np.array(response["embeddings"], dtype=float)
+                    all_embs.append(emb)
+                    break  # success, exit retry loop
+                except Exception as e:
+                    if "429" in str(e):
+                        wait = 5 * (attempt + 1)
+                        print(f"Rate-limited (429). Waiting {wait}s before retry...")
+                        time.sleep(wait)
+                        continue
+                    else:
+                        raise
+            else:
+                raise RuntimeError("Embedding failed repeatedly due to API throttling.")
+
+        # Concatenate all batches
+        all_embs = np.concatenate(all_embs, axis=0)
+        print(f"Total embeddings received: {all_embs.shape}")
+
+        # Reshape back to list[np.ndarray] per utterance (12 × embedding_dim)
+        reshaped = [all_embs[i * n_channels : (i + 1) * n_channels] for i in range(n_utts)]
+        return reshaped
+
+    # -----------------------------
+    # Step 3: fusion
+    # -----------------------------
+    def _fuse_embeddings_timeseries(
+        self, timeseries: np.ndarray, embeddings: np.ndarray
+    ) -> np.ndarray:
+        """
+        Fuses raw time series (12 x T_i)
+        with embeddings (12 x embedding_dim)
+        using element-wise addition and zero padding.
+        """
+        ts = np.array(timeseries, dtype=float)
+        emb = np.array(embeddings, dtype=float)
 
         n_timesteps = ts.shape[1]
         embedding_dim = emb.shape[1]
-
         fused_length = max(n_timesteps, embedding_dim)
 
         def pad_to(arr, target_len):
@@ -91,20 +126,21 @@ class add_time_series_to_embedding:
                 return np.pad(arr, ((0, 0), (0, pad_width)), mode="constant", constant_values=0)
             else:
                 return arr[:, :target_len]
-       
+
         ts_padded = pad_to(ts, fused_length)
         emb_padded = pad_to(emb, fused_length)
-
         fused = ts_padded + emb_padded
         return fused
 
+    # -----------------------------
+    # Accessors
+    # -----------------------------
     @property
-    def get_embeddings(self) -> np.ndarray:
+    def get_embeddings(self) -> list[np.ndarray]:
+        """List of embeddings (each np.ndarray of shape (12, embedding_dim))"""
         return self.embeddings
-    
-    @property
-    def get_fused(self) -> np.ndarray:
-        return self.fused
-        
-        
 
+    @property
+    def get_fused(self) -> list[np.ndarray]:
+        """List of fused representations (each np.ndarray of shape (12, max(T, embedding_dim)))"""
+        return self.fused

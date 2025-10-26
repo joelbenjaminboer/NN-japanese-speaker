@@ -24,6 +24,11 @@ AUGMENTATION:
     # - type: frequency_masking
     #   max_mask_percentage: 0.01
 
+EMBEDDING:
+  MODEL: "nomic-embed-text-v1.5"
+  DIMENSION: 128
+  PRE_PRECISION: 2
+
 INPUT_DIRS:
   TRAIN_FILE: "data/ae.train"
   TEST_FILE: "data/ae.test"
