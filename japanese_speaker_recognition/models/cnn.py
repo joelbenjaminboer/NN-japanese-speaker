@@ -1,5 +1,10 @@
+from typing import Self
+
 import torch
 import torch.nn as nn
+from torch.nn.modules.container import Sequential
+from torch.nn.modules.pooling import AdaptiveAvgPool1d
+from typing_extensions import override
 
 
 class HAIKU(nn.Module):
@@ -23,7 +28,7 @@ class HAIKU(nn.Module):
             input_channels: Number of input channels (features)
     """
 
-     def __init__(
+    def __init__(
         self,
         num_classes: int = 9,
         dropout: float = 0.3,
@@ -31,32 +36,38 @@ class HAIKU(nn.Module):
         kernel_size: int = 3,
         conv_channels: int = 128,
         hidden_dim: int = 64,
-        input_channels: int = 12
+        input_channels: int = 12,
     ):
         super().__init__()
-        self.embedding_dim = embedding_dim
+        self.embedding_dim: int = embedding_dim
 
         # Single convolutional layer
         padding = kernel_size // 2
-        self.conv = nn.Sequential(
-            nn.Conv1d(in_channels=input_channels, out_channels=conv_channels, 
-                      kernel_size=kernel_size, padding=padding),
+        self.convolution: Sequential = nn.Sequential(
+            nn.Conv1d(
+                in_channels=input_channels,
+                out_channels=conv_channels,
+                kernel_size=kernel_size,
+                padding=padding,
+            ),
             nn.BatchNorm1d(conv_channels),
             nn.GELU(),
-            nn.Dropout(dropout))
+            nn.Dropout(dropout),
+        )
 
         # Global pooling to get fixed-size representation
-        self.global_pool = nn.AdaptiveAvgPool1d(1)  # [B, conv_channels, 1]
+        self.global_pool: AdaptiveAvgPool1d = nn.AdaptiveAvgPool1d(1)  # [B, conv_channels, 1]
 
         # MLP: 2 linear layers for classification
-        self.classifier = nn.Sequential(
+        self.perceptron: Sequential = nn.Sequential(
             nn.Flatten(),  # [B, conv_channels, 1] -> [B, conv_channels]
             nn.Linear(conv_channels, hidden_dim),  # First linear layer
             nn.GELU(),
             nn.Dropout(dropout),
-            nn.Linear(hidden_dim, num_classes)  # Second linear layer
+            nn.Linear(hidden_dim, num_classes),  # Second linear layer
         )
 
+    @override
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Args:
@@ -65,24 +76,24 @@ class HAIKU(nn.Module):
             logits: Tensor of shape [B, num_classes]
         """
         # Extract temporal patterns
-        x = self.conv(x)  # [B, 128, 16]
+        x = self.convolution(x)  # [B, 128, 16]
 
         # Global pooling
         x = self.global_pool(x)  # [B, 128, 1]
 
         # Classify
-        logits = self.classifier(x)  # [B, num_classes]
+        logits = self.perceptron(x)  # [B, num_classes]
 
         return logits
 
     def extract_features(self, x: torch.Tensor) -> torch.Tensor:
         """Extract CNN features without classification."""
-        x = self.conv(x)
+        x = self.convolution(x)
         x = self.global_pool(x)
         return x.squeeze(-1)  # [B, 128]
 
     @classmethod
-    def from_config(cls, config: dict):
+    def from_config(cls, config: dict[str, int | float]) -> Self:
         """
         Create SpeakerCNN from configuration dictionary.
         Args:
@@ -91,9 +102,9 @@ class HAIKU(nn.Module):
             SpeakerCNN instance
         """
         return cls(
-            dropout=config.get("DROPOUT", 0.3),
-            embedding_dim=config.get("EMBEDDING_DIM", 64),
-            kernel_size=config.get("KERNEL_SIZE", 5),
-            conv_channels=config.get("CONV_CHANNELS", 128),
-            hidden_dim=config.get("HIDDEN_DIM", 64)
+            dropout=float(config.get("DROPOUT", 0.3)),
+            embedding_dim=int(config.get("EMBEDDING_DIM", 64)),
+            kernel_size=int(config.get("KERNEL_SIZE", 5)),
+            conv_channels=int(config.get("CONV_CHANNELS", 128)),
+            hidden_dim=int(config.get("HIDDEN_DIM", 64)),
         )

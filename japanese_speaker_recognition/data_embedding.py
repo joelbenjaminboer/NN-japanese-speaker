@@ -72,8 +72,8 @@ class EmbeddingPipeline:
             for attempt in range(5):
                 try:
                     print(
-                        f"Embedding chunk {i // batch_size + 1}/{-(-len(all_texts) // batch_size)} "
-                        f"({len(chunk)}"
+                        f"Embedding chunk {i // batch_size + 1}/{-(-len(all_texts) // batch_size)} \
+                            ({len(chunk)})"
                     )
                     response = embed.text(
                         texts=chunk,
@@ -105,9 +105,8 @@ class EmbeddingPipeline:
     # -----------------------------
     # Step 3: fusion
     # -----------------------------
-    def _fuse_embeddings_timeseries(
-        self, timeseries: np.ndarray, embeddings: np.ndarray
-    ) -> np.ndarray:
+    @staticmethod
+    def _fuse_embeddings_timeseries(timeseries: np.ndarray, embeddings: np.ndarray) -> np.ndarray:
         """
         Fuses raw time series (12 x T_i)
         with embeddings (12 x embedding_dim)
@@ -121,7 +120,7 @@ class EmbeddingPipeline:
         fused_length = max(n_timesteps, embedding_dim)
 
         def pad_to(arr, target_len):
-            pad_width = target_len - arr.shape[1]
+            pad_width = int(target_len - arr.shape[1])
             if pad_width > 0:
                 return np.pad(arr, ((0, 0), (0, pad_width)), mode="constant", constant_values=0)
             else:

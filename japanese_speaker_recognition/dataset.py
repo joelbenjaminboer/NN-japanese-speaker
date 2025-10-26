@@ -78,7 +78,7 @@ class JapaneseVowelsDataset:
             train_file=Path(in_dirs.get("TRAIN_FILE", "data/ae.train")),
             test_file=Path(in_dirs.get("TEST_FILE", "data/ae.test")),
             out_dir=Path(out_dirs.get("PROCESSED", "data/processed_data")),
-            aug_file=Path(aug_cfg.get("AUG_FILE")) if aug_cfg.get("AUG_FILE") else None,
+            aug_file=Path(aug_cfg.get("AUG_FILE"), "data/augmented"),
         )
         self.paths = paths
         self.paths.out_dir.mkdir(parents=True, exist_ok=True)
