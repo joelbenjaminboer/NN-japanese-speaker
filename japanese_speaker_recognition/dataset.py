@@ -36,23 +36,23 @@ class JapaneseVowelsDataset:
             - saving NPZ artifacts
     """
 
-    def __init__(self, cfg: dict[str, Any], augmenter: AugmentationPipeline | None = None) -> None:
-        self.cfg = cfg
+    def __init__(self, config: dict[str, Any], augmenter: AugmentationPipeline | None = None) -> None:
+        self.cfg = config
         self.augmenter = augmenter
 
         # ---- Parse config ----
-        data_url = cfg.get("DATA_URL", "").rstrip("/") + "/"
-        in_dirs = cfg.get("INPUT_DIRS", {})
-        out_dirs = cfg.get("OUTPUT_DIRS", {})
-        aug_cfg = cfg.get("AUGMENTATION", {}) or {}
+        data_url = config.get("DATA_URL", "").rstrip("/") + "/"
+        in_dirs = config.get("INPUT_DIRS", {})
+        out_dirs = config.get("OUTPUT_DIRS", {})
+        aug_cfg = config.get("AUGMENTATION", {}) or {}
 
-        self.max_len: int = int(cfg.get("MAX_LEN", 29))
-        self.n_features: int = int(cfg.get("N_FEATURES", 12))
+        self.max_len: int = int(config.get("MAX_LEN", 29))
+        self.n_features: int = int(config.get("N_FEATURES", 12))
 
         self.pipeline_flags = {
-            "train": bool(cfg.get("PIPELINE", {}).get("TRAIN", True)),
-            "test": bool(cfg.get("PIPELINE", {}).get("TEST", False)),
-            "augment": bool(cfg.get("PIPELINE", {}).get("AUGMENT", False)),
+            "train": bool(config.get("PIPELINE", {}).get("TRAIN", True)),
+            "test": bool(config.get("PIPELINE", {}).get("TEST", False)),
+            "augment": bool(config.get("PIPELINE", {}).get("AUGMENT", False)),
         }
 
         self.aug_enable: bool = bool(aug_cfg.get("AUGMENT", False))
@@ -60,14 +60,13 @@ class JapaneseVowelsDataset:
             aug_cfg.get("REPEATS", 0)
         )  # optional; defaults to 0 if not in YAML
 
-        paths = DatasetPaths(
+        self.paths = DatasetPaths(
             data_url=data_url,
             train_file=Path(in_dirs.get("TRAIN_FILE", "data/ae.train")),
             test_file=Path(in_dirs.get("TEST_FILE", "data/ae.test")),
             out_dir=Path(out_dirs.get("PROCESSED", "data/processed_data")),
-            aug_file=Path(aug_cfg.get("AUG_FILE")) if aug_cfg.get("AUG_FILE") else None,
+            aug_file=Path(aug_cfg.get("AUG_FILE", "data/augmented_data.npz")),
         )
-        self.paths = paths
         self.paths.out_dir.mkdir(parents=True, exist_ok=True)
 
         self.scaler: StandardScaler | None = None  # fitted on train

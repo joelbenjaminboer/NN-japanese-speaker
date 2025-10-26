@@ -17,16 +17,22 @@ def load_config(path: str | Path = "config.yaml") -> dict[str, Any]:
     with p.open("r", encoding="utf-8") as f:
         return yaml.safe_load(f) or {}
 
+def prepare_data(config: dict[str, Any]):
+    heading("01 Data Preparation")
+
+    dataset = JapaneseVowelsDataset(
+        config=config
+        )
 
 def main():
     # Load the config and print current settings
     cfg = load_config()
     heading("Config settings")
-    print(yaml.safe_dump(cfg, sort_keys=True, default_flow_style=False))
+    print(yaml.safe_dump(cfg, sort_keys=True))
 
     # Build augmenter from YAML
     # heading("Augmentation") # Nothing prints here
-    aug_cfg = cfg.get("AUGMENTATION") or {}
+    aug_cfg = cfg.get("AUGMENTATION", {})
     augmenter = AugmentationPipeline.from_config(aug_cfg) if aug_cfg else None
 
     # Prep the dataset
