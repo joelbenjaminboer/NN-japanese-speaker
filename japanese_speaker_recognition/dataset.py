@@ -11,6 +11,7 @@ from sklearn.preprocessing import StandardScaler
 # if you keep these helpers in your project:
 # japanese_speaker_recognition.data_augmentation as data_aug
 from japanese_speaker_recognition.data_augmentation import AugmentationPipeline
+from japanese_speaker_recognition.data_embedding import EmbeddingPipeline
 
 
 @dataclass
@@ -36,9 +37,21 @@ class JapaneseVowelsDataset:
             - saving NPZ artifacts
     """
 
-    def __init__(self, cfg: dict[str, Any], augmenter: AugmentationPipeline | None = None) -> None:
+    def __init__(
+        self,
+        cfg: dict[str, Any],
+        augmenter: AugmentationPipeline | None = None,
+        embedding_dim: int = 64,
+        embedding_model: str = "nomic-embed-text-v1.5",
+        embedidng_precision: int = 2,
+    ) -> None:
         self.cfg = cfg
         self.augmenter = augmenter
+
+        # ---- Embedding config ----
+        self.embedding_dim = embedding_dim
+        self.embedding_model = embedding_model
+        self.embedding_precision = embedidng_precision
 
         # ---- Parse config ----
         data_url = cfg.get("DATA_URL", "").rstrip("/") + "/"
@@ -77,51 +90,101 @@ class JapaneseVowelsDataset:
     # --------------------------
     def prepare(self) -> dict[str, Any]:
         """
-        Runs the configured parts of the pipeline and returns a dict of arrays.
-        Also writes NPZ files under OUTPUT_DIRS.PROCESSED.
+        Full dataset preparation pipeline:
+        1. Download & parse
+        2. Optionally augment (raw data)
+        3. Normalize to [0,1] (fit on train+aug)
+        4. Embed (handles padding + fusion)
+        5. Save artifacts
         """
         self._download_if_missing()
 
-        # Parse raw
+        # --------------------------
+        # Parse raw data
+        # --------------------------
         train_utts = self._read_utterances(self.paths.train_file)
         test_utts = self._read_utterances(self.paths.test_file)
+        print(f"Parsed {len(train_utts)} train and {len(test_utts)} test utterances.")
 
-        # Pad
-        X_train, len_train = self._pad_sequences(train_utts, self.max_len)
-        X_test, len_test = self._pad_sequences(test_utts, self.max_len)
+        # --------------------------
+        # Optional augmentation
+        # --------------------------
+        y_train = self._generate_train_labels()
+        if self.pipeline_flags["augment"] and self.aug_enable and self.aug_repeats > 0:
+            if not self.augmenter:
+                raise ValueError("Augmentation requested but no augmenter provided.")
 
-        # Labels
+            print(f"Running data augmentation ({self.aug_repeats}× repeats)...")
+            X_aug, y_aug = self._augment_repeat(
+                np.array(train_utts, dtype=object), y_train, repeats=self.aug_repeats
+            )
+            train_utts_aug = [np.array(utt, dtype=float) for utt in X_aug]
+            train_utts += train_utts_aug
+            y_train = np.concatenate([y_train, y_aug])
+            print(f"Augmented training set: now {len(train_utts)} utterances total.")
+
+        # --------------------------
+        # Normalize after augmentation
+        # --------------------------
+        print("Normalizing training and test utterances to [0, 1] range...")
+        train_utts, test_utts = self._minmax_normalize_train_test(train_utts, test_utts)
+
+        # --------------------------
+        # Embedding (includes fusion)
+        # --------------------------
+        print("Embedding training utterances...")
+        train_embedder = EmbeddingPipeline(
+            timeseries=train_utts,
+            model_name=self.embedding_model,
+            dimension=self.embedding_dim,
+            precision=self.embedding_precision,
+        )
+
+        print("Embedding test utterances...")
+        test_embedder = EmbeddingPipeline(
+            timeseries=test_utts,
+            model_name=self.embedding_model,
+            dimension=self.embedding_dim,
+            precision=self.embedding_precision,
+        )
+
+        X_train = np.stack(train_embedder.get_fused)
+        X_test = np.stack(test_embedder.get_fused)
+
+        print(f"Embedded X_train shape: {X_train.shape}")
+        print(f"Embedded X_test shape: {X_test.shape}")
+
+        # --------------------------
+        # Step 5: Labels
+        # --------------------------
         y_train = self._generate_train_labels()
         y_test = self._generate_test_labels()
 
-        # Normalize (fit on train only)
-        X_train, X_test = self._normalize_train_test(X_train, X_test)
-
-        # Save core artifacts
+        # --------------------------
+        # Save all outputs
+        # --------------------------
         train_npz = self.paths.out_dir / "train_data.npz"
         test_npz = self.paths.out_dir / "test_data.npz"
 
-        np.savez_compressed(train_npz, X_train=X_train, y_train=y_train, len_train=len_train)
-        np.savez_compressed(test_npz, X_test=X_test, y_test=y_test, len_test=len_test)
+        np.savez_compressed(train_npz, X_train=X_train, y_train=y_train)
+        np.savez_compressed(test_npz, X_test=X_test, y_test=y_test)
 
         out = {
             "X_train": X_train,
             "y_train": y_train,
-            "len_train": len_train,
             "X_test": X_test,
             "y_test": y_test,
-            "len_test": len_test,
             "train_npz": str(train_npz),
             "test_npz": str(test_npz),
         }
 
-        # Optional augmentation
         if self.pipeline_flags["augment"] and self.aug_enable and self.aug_repeats > 0:
-            X_aug, y_aug = self._augment_repeat(X_train, y_train, repeats=self.aug_repeats)
-            # prefer AUG_FILE from config; otherwise drop inside processed dir
-            aug_path = self.paths.aug_file or (self.paths.out_dir / "augmented_data.npz")
-            np.savez_compressed(aug_path, X_augmented=X_aug, y_augmented=y_aug)
-            out.update({"X_augmented": X_aug, "y_augmented": y_aug, "augmented_npz": str(aug_path)})
+            out.update(
+                {
+                    "X_augmented": X_train[-len(y_aug) :],
+                    "y_augmented": y_aug,
+                }
+            )
 
         return out
 
@@ -141,10 +204,10 @@ class JapaneseVowelsDataset:
 
     def _read_utterances(self, filename: Path) -> list[np.ndarray]:
         """
-		Read Japanese Vowels dataset, where utterances are separated by lines of 12 ones \
-			(1.0 ... 1.0).
-		Returns a list of utterances, each an array of shape (T, 12).
-		"""
+        Reads the Japanese Vowels dataset.
+        Each utterance is transposed to shape (12, T), with variable T (no padding).
+        Returns: list of np.ndarray, each of variable length in time.
+        """
         utterances: list[np.ndarray] = []
         current_utt: list[list[float]] = []
 
@@ -161,18 +224,17 @@ class JapaneseVowelsDataset:
                 except ValueError:
                     continue
 
-                # separator if all ~1.0
                 if all(abs(x - 1.0) < 1e-6 for x in floats):
                     if current_utt:
-                        utterances.append(np.array(current_utt, dtype=float))
+                        utt = np.array(current_utt, dtype=float).T
+                        utterances.append(utt)
                         current_utt = []
                 else:
                     current_utt.append(floats)
 
         if current_utt:
-            utterances.append(np.array(current_utt, dtype=float))
+            utterances.append(np.array(current_utt, dtype=float).T)
 
-        print(f"Parsed {len(utterances)} utterances from {filename}")
         return utterances
 
     def _pad_sequences(
@@ -188,6 +250,38 @@ class JapaneseVowelsDataset:
             lengths[i] = T
             X[i, :T, :] = seq
         return X, lengths
+
+    def _minmax_normalize_train_test(
+        self, train_utts: list[np.ndarray], test_utts: list[np.ndarray]
+    ) -> tuple[list[np.ndarray], list[np.ndarray]]:
+        """
+        Min–max normalize each feature dimension of all utterances to [0, 1],
+        using min and max computed across *all* training utterances.
+        Args:
+            train_utts (list[np.ndarray]): list of arrays (12, T_i) for training set
+            test_utts  (list[np.ndarray]): list of arrays (12, T_j) for test set
+        Returns:
+            tuple: (normalized_train_utts, normalized_test_utts)
+        """
+
+        all_train_concat = np.concatenate(train_utts, axis=1)
+        feat_min = all_train_concat.min(axis=1, keepdims=True)
+        feat_max = all_train_concat.max(axis=1, keepdims=True)
+        denom = np.where(feat_max - feat_min == 0, 1e-8, feat_max - feat_min)
+
+        def normalize_list(utts: list[np.ndarray]) -> list[np.ndarray]:
+            normalized = []
+            for utt in utts:
+                utt_norm = (utt - feat_min) / denom
+                normalized.append(utt_norm)
+            return normalized
+
+        norm_train = normalize_list(train_utts)
+        norm_test = normalize_list(test_utts)
+
+        self.scaler = {"min": feat_min, "max": feat_max}
+
+        return norm_train, norm_test
 
     def _normalize_train_test(
         self, X_train: np.ndarray, X_test: np.ndarray

@@ -3,10 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import yaml
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
+import yaml
 
 from japanese_speaker_recognition.data_augmentation import AugmentationPipeline
 from japanese_speaker_recognition.dataset import JapaneseVowelsDataset

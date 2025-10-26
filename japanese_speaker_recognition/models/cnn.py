@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-from typing import List, Optional
 
 
 class HAIKU(nn.Module):
@@ -24,7 +23,7 @@ class HAIKU(nn.Module):
             input_channels: Number of input channels (features)
     """
 
-    def __init__(
+     def __init__(
         self,
         num_classes: int = 9,
         dropout: float = 0.3,
