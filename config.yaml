@@ -31,11 +31,16 @@ INPUT_DIRS:
 OUTPUT_DIRS:
   PROCESSED: "data/processed_data"
 
-#MODELS
-CNN:
-  NUM_CLASSES: 9  # Number of speakers
+#HAIKU
+MODEL:
+  NUM_CLASSES: 9
   DROPOUT: 0.3
-  CONV_CHANNELS: [32, 64, 128]  # Channel sizes for each conv layer
-  KERNEL_SIZES: [3, 5, 5]  # Kernel sizes for each conv layer
-  POOLING: [1, 2, 2]  # Pooling stride (1 = no pooling, 2 = MaxPool with stride 2)
-  MLP_HIDDEN: 64  # Hidden layer size in classifier
+  EMBEDDING_DIM: 64
+  KERNEL_SIZE: 5
+  CONV_CHANNELS: 128
+  HIDDEN_DIM: 64
+  INPUT_CHANNELS: 12
+  LEARNING_RATE: 0.001
+  BATCH_SIZE: 32
+  NUM_EPOCHS: 10
+  DEVICE: "cuda"  # Options: "cuda", "cpu", "auto" (auto-detect)
