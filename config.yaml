@@ -30,3 +30,12 @@ INPUT_DIRS:
 
 OUTPUT_DIRS:
   PROCESSED: "data/processed_data"
+
+#MODELS
+CNN:
+  NUM_CLASSES: 9  # Number of speakers
+  DROPOUT: 0.3
+  CONV_CHANNELS: [32, 64, 128]  # Channel sizes for each conv layer
+  KERNEL_SIZES: [3, 5, 5]  # Kernel sizes for each conv layer
+  POOLING: [1, 2, 2]  # Pooling stride (1 = no pooling, 2 = MaxPool with stride 2)
+  MLP_HIDDEN: 64  # Hidden layer size in classifier
