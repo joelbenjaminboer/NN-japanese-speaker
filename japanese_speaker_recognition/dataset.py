@@ -90,12 +90,26 @@ class JapaneseVowelsDataset:
     # --------------------------
     def prepare(self) -> dict[str, Any]:
         """
-        Full dataset preparation pipeline:
-        1. Download & parse
-        2. Optionally augment (raw data)
-        3. Normalize to [0,1] (fit on train+aug)
-        4. Embed (handles padding + fusion)
-        5. Save artifacts
+        Prepare the full dataset.
+
+        Pipeline:
+          - Download & parse raw files.
+          - Optionally augment training data (raw).
+          - Normalize features to [0, 1] using training stats.
+          - Embed time series (handles padding + fusion).
+          - Save artifacts (.npz).
+
+        Returns:
+            :dict:
+              - "X_train": np.ndarray
+              - "y_train": np.ndarray
+              - "X_test": np.ndarray
+              - "y_test": np.ndarray
+              - "train_npz": Path
+              - "test_npz": Path
+            Optional (if augmentation):
+              - "X_augmented": np.ndarray
+              - "y_augmented": np.ndarray
         """
         self._download_if_missing()
 
@@ -297,15 +311,17 @@ class JapaneseVowelsDataset:
         return X_train_norm, X_test_norm
 
     # Label helpers (dataset-specific)
+    @staticmethod
     def _generate_train_labels(
-        self, num_speakers: int = 9, utterances_per_speaker: int = 30
+        num_speakers: int = 9, utterances_per_speaker: int = 30
     ) -> np.ndarray:
         labels: list[int] = []
         for speaker_id in range(num_speakers):
             labels += [speaker_id] * utterances_per_speaker
         return np.array(labels, dtype=int)
 
-    def _generate_test_labels(self) -> np.ndarray:
+    @staticmethod
+    def _generate_test_labels() -> np.ndarray:
         block_sizes = [31, 35, 88, 44, 29, 24, 40, 50, 29]  # per speaker 1–9
         labels: list[int] = []
         for speaker_id, n in enumerate(block_sizes):
