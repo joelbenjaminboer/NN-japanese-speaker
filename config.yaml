@@ -24,6 +24,11 @@ AUGMENTATION:
     # - type: frequency_masking
     #   max_mask_percentage: 0.01
 
+EMBEDDING:
+  MODEL: "nomic-embed-text-v1.5"
+  DIMENSION: 64
+  PRE_PRECISION: 2
+
 INPUT_DIRS:
   TRAIN_FILE: "data/ae.train"
   TEST_FILE: "data/ae.test"
@@ -40,7 +45,7 @@ MODEL:
   CONV_CHANNELS: 128
   HIDDEN_DIM: 64
   INPUT_CHANNELS: 12
-  LEARNING_RATE: 0.001
+  LEARNING_RATE: 0.007
   BATCH_SIZE: 32
   NUM_EPOCHS: 10
   DEVICE: "cuda"  # Options: "cuda", "cpu", "auto" (auto-detect)
