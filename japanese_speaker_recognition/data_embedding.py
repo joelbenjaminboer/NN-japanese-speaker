@@ -3,15 +3,16 @@ import os
 import numpy as np
 from nomic import embed
 
-
 class EmbeddingPipeline:
+    
     def __init__(
         self,
         timeseries: list[np.ndarray],
         model_name: str = "nomic-embed-text-v1.5",
         dimension: int = 64,
         precision: int = 2,
-        out_dir: str = "data/processed_data/fused_embeddings.npy",
+        test_dir: str = "data/processed_data/test_embeddings.npy",
+        train_dir: str = "data/processed_data/train_embeddings.npy",
     ) -> None:
         """
         Embedding pipeline for a list of utterances (each np.ndarray of shape (12, T_i)).
@@ -26,7 +27,7 @@ class EmbeddingPipeline:
         self.precision = precision
         self.original_timeseries = timeseries
         
-        if not os.path.exists(os.path.join(out_dir, f"fused_representations.npy")):
+        if not os.path.exists(test_dir):
             # Run the embedding pipeline
             self.processed_timeseries = [self._preprocess_timeseries(utt) for utt in timeseries]
             self.embeddings = self._embed(self.processed_timeseries)
@@ -35,9 +36,24 @@ class EmbeddingPipeline:
                 for utt, emb in zip(timeseries, self.embeddings, strict=True)
             ]
             # Save fused representations
-            np.save(os.path.join(out_dir, f"fused_representations.npy"), self.fused)
+            np.save(os.path.join(test_dir), self.fused)
         else:
             print("Fused representations already exist.")
+            self.fused = np.load(os.path.join(test_dir), allow_pickle=True)
+        
+        if not os.path.exists(train_dir):
+            # Run the embedding pipeline
+            self.processed_timeseries = [self._preprocess_timeseries(utt) for utt in timeseries]
+            self.embeddings = self._embed(self.processed_timeseries)
+            self.fused = [
+                self._fuse_embeddings_timeseries(utt, emb)
+                for utt, emb in zip(timeseries, self.embeddings, strict=True)
+            ]
+            # Save fused representations
+            np.save(os.path.join(train_dir), self.fused)
+        else:
+            print("Fused representations already exist.")
+            self.fused = np.load(os.path.join(train_dir), allow_pickle=True)
 
     # -----------------------------
     # Step 1: preprocessing
