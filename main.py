@@ -239,35 +239,35 @@ def main():
 
     print_model_summary(model, (batch_size, input_channels, embedding_dim))
 
-    # Create dummy data for demonstration
-    heading("Creating Dummy DataLoaders")
-    num_train_samples = 200
-    num_val_samples = 50
-    num_classes = model_cfg.get("NUM_CLASSES", 9)
+    # # Create dummy data for demonstration
+    # heading("Creating Dummy DataLoaders")
+    # num_train_samples = 200
+    # num_val_samples = 50
+    # num_classes = model_cfg.get("NUM_CLASSES", 9)
 
-    train_x = torch.randn(num_train_samples, input_channels, embedding_dim)
-    train_y = torch.randint(0, num_classes, (num_train_samples,))
-    val_x = torch.randn(num_val_samples, input_channels, embedding_dim)
-    val_y = torch.randint(0, num_classes, (num_val_samples,))
+    # train_x = torch.randn(num_train_samples, input_channels, embedding_dim)
+    # train_y = torch.randint(0, num_classes, (num_train_samples,))
+    # val_x = torch.randn(num_val_samples, input_channels, embedding_dim)
+    # val_y = torch.randint(0, num_classes, (num_val_samples,))
 
-    train_dataset = TensorDataset(train_x, train_y)
-    val_dataset = TensorDataset(val_x, val_y)
+    # train_dataset = TensorDataset(train_x, train_y)
+    # val_dataset = TensorDataset(val_x, val_y)
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    # train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    # val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
-    print(f"Train samples: {num_train_samples}, Val samples: {num_val_samples}")
-    print(f"Batch size: {batch_size}")
-    print(f"Train batches: {len(train_loader)}, Val batches: {len(val_loader)}")
+    # print(f"Train samples: {num_train_samples}, Val samples: {num_val_samples}")
+    # print(f"Batch size: {batch_size}")
+    # print(f"Train batches: {len(train_loader)}, Val batches: {len(val_loader)}")
 
-    # Train the model
-    history = train_model(model, train_loader, val_loader, model_cfg, device)
+    # # Train the model
+    # history = train_model(model, train_loader, val_loader, model_cfg, device)
 
-    # Print final results
-    heading("Training Complete")
-    print(f"Final Train Accuracy: {history['train_acc'][-1]:.2f}%")
-    print(f"Final Validation Accuracy: {history['val_acc'][-1]:.2f}%")
-    print(f"Best Validation Accuracy: {max(history['val_acc']):.2f}%")
+    # # Print final results
+    # heading("Training Complete")
+    # print(f"Final Train Accuracy: {history['train_acc'][-1]:.2f}%")
+    # print(f"Final Validation Accuracy: {history['val_acc'][-1]:.2f}%")
+    # print(f"Best Validation Accuracy: {max(history['val_acc']):.2f}%")
 
 
 if __name__ == "__main__":

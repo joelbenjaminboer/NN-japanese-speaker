@@ -1,5 +1,5 @@
 import time
-
+import os
 import numpy as np
 from nomic import embed
 
@@ -11,6 +11,7 @@ class EmbeddingPipeline:
         model_name: str = "nomic-embed-text-v1.5",
         dimension: int = 64,
         precision: int = 2,
+        out_dir: str = "data/processed_data/fused_embeddings.npy",
     ) -> None:
         """
         Embedding pipeline for a list of utterances (each np.ndarray of shape (12, T_i)).
@@ -24,14 +25,19 @@ class EmbeddingPipeline:
         self.dimension = dimension
         self.precision = precision
         self.original_timeseries = timeseries
-
-        # Run the embedding pipeline
-        self.processed_timeseries = [self._preprocess_timeseries(utt) for utt in timeseries]
-        self.embeddings = self._embed(self.processed_timeseries)
-        self.fused = [
-            self._fuse_embeddings_timeseries(utt, emb)
-            for utt, emb in zip(timeseries, self.embeddings, strict=True)
-        ]
+        
+        if not os.path.exists(os.path.join(out_dir, f"fused_representations.npy")):
+            # Run the embedding pipeline
+            self.processed_timeseries = [self._preprocess_timeseries(utt) for utt in timeseries]
+            self.embeddings = self._embed(self.processed_timeseries)
+            self.fused = [
+                self._fuse_embeddings_timeseries(utt, emb)
+                for utt, emb in zip(timeseries, self.embeddings, strict=True)
+            ]
+            # Save fused representations
+            np.save(os.path.join(out_dir, f"fused_representations.npy"), self.fused)
+        else:
+            print("Fused representations already exist.")
 
     # -----------------------------
     # Step 1: preprocessing
@@ -64,7 +70,7 @@ class EmbeddingPipeline:
         n_channels = len(processed_utterances[0])
 
         all_embs = []
-        batch_size = 100  # <= recommended by Nomic
+        batch_size = 100
         for i in range(0, len(all_texts), batch_size):
             chunk = all_texts[i : i + batch_size]
 
@@ -134,20 +140,6 @@ class EmbeddingPipeline:
     # -----------------------------
     # Accessors
     # -----------------------------
-    @property
-    def save_fused(self, out_dir) -> list[np.ndarray]:
-        """Saves fused representations to specified directory."""
-        import os
-
-        if not os.path.exists(out_dir):
-            os.makedirs(out_dir)
-
-        file_paths = []
-        for idx, fused_rep in enumerate(self.fused):
-            file_path = os.path.join(out_dir, f"fused_representation_{idx}.npy")
-            np.save(file_path, fused_rep)
-            file_paths.append(file_path)
-    
     @property
     def get_embeddings(self) -> list[np.ndarray]:
         """List of embeddings (each np.ndarray of shape (12, embedding_dim))"""
