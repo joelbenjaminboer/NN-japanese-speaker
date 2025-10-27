@@ -9,7 +9,7 @@ MAX_LEN: 29  # longest utterance length (7–29)
 N_FEATURES: 12
 
 AUGMENTATION:
-  AUGMENT: true
+  AUGMENT: false
   REPEATS: 100
   AUG_FILE: "data/augmented_data.npz"
   SEED: 42
@@ -36,7 +36,7 @@ MODEL:
   NUM_CLASSES: 9
   DROPOUT: 0.3
   EMBEDDING_DIM: 64
-  KERNEL_SIZE: 5
+  KERNEL_SIZE: 3
   CONV_CHANNELS: 128
   HIDDEN_DIM: 64
   INPUT_CHANNELS: 12
