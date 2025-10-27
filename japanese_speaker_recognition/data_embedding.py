@@ -134,6 +134,11 @@ class EmbeddingPipeline:
     # -----------------------------
     # Accessors
     # -----------------------------
+    def save_fused(self, filepath: str) -> None:
+        """Saves fused representations to a .npz file."""
+        np.savez_compressed(filepath, *self.fused)
+        return self.fused
+    
     @property
     def get_embeddings(self) -> list[np.ndarray]:
         """List of embeddings (each np.ndarray of shape (12, embedding_dim))"""
