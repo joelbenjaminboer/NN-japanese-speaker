@@ -60,7 +60,8 @@ def main():
     artifacts = ds.prepare()
     x_train = artifacts["X_train"]
     y_train = artifacts["y_train"]
-    
+    x_val = artifacts["X_test"]
+    y_val = artifacts["y_test"]
 
     # quick summary (shapes + file outputs)
     heading("Artifacts")
@@ -75,7 +76,6 @@ def main():
     model_cfg = cfg.get("MODEL", {})
     model = HAIKU.create_model(model_cfg)
     
-
     # Print detailed model summary
     batch_size = model_cfg.get("BATCH_SIZE", 32)
     embedding_dim = model_cfg.get("EMBEDDING_DIM", 64)
@@ -84,7 +84,15 @@ def main():
     print_model_summary(model, (batch_size, input_channels, embedding_dim))
 
     # Train the model
-    history = model.train_model(train_loader, val_loader, model_cfg)
+    history = model.train_model(
+        x_train,
+        y_train,
+        x_val,
+        y_val,
+        learning_rate=model_cfg.get("LEARNING_RATE", 0.007),
+        num_epochs=model_cfg.get("NUM_EPOCHS", 10),
+        batch_size=model_cfg.get("BATCH_SIZE", 32)
+    )
 
     # Print final results
     heading("Training Complete")

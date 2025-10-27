@@ -1,10 +1,12 @@
 from typing import Self
 
+from numpy import ndarray
+
 import torch
 import torch.nn as nn
 from torch.nn.modules.container import Sequential
 from torch.nn.modules.pooling import AdaptiveAvgPool1d
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, TensorDataset
 from typing_extensions import override
 
 from utils.utils import heading
@@ -173,13 +175,21 @@ class HAIKU(nn.Module):
 
     def train_model(
         self,
-        train_loader: DataLoader,
-        val_loader: DataLoader,
-        model_cfg: dict,
+        x_train: ndarray,
+        y_train: ndarray,
+        x_val: ndarray,
+        y_val: ndarray,
+        learning_rate: float = 0.007,
+        num_epochs: int = 10,
+        batch_size: int = 32
     ) -> dict:
         """Train the model and return training history."""
-        learning_rate = model_cfg.get("LEARNING_RATE", 0.007)
-        num_epochs = model_cfg.get("NUM_EPOCHS", 10)
+
+        train_dataset = TensorDataset(x_train, y_train)
+        val_dataset = TensorDataset(x_val, y_val)
+
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+        val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
         optimizer = torch.optim.RAdam(self.parameters(), lr=learning_rate)
         criterion = nn.CrossEntropyLoss()
@@ -270,5 +280,3 @@ class HAIKU(nn.Module):
         avg_loss = total_loss / len(dataloader)
         accuracy = 100 * correct / total
         return avg_loss, accuracy
-
-
