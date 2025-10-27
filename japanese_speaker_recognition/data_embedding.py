@@ -135,6 +135,20 @@ class EmbeddingPipeline:
     # Accessors
     # -----------------------------
     @property
+    def save_fused(self, out_dir) -> list[np.ndarray]:
+        """Saves fused representations to specified directory."""
+        import os
+
+        if not os.path.exists(out_dir):
+            os.makedirs(out_dir)
+
+        file_paths = []
+        for idx, fused_rep in enumerate(self.fused):
+            file_path = os.path.join(out_dir, f"fused_representation_{idx}.npy")
+            np.save(file_path, fused_rep)
+            file_paths.append(file_path)
+    
+    @property
     def get_embeddings(self) -> list[np.ndarray]:
         """List of embeddings (each np.ndarray of shape (12, embedding_dim))"""
         return self.embeddings

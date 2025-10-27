@@ -26,7 +26,7 @@ AUGMENTATION:
 
 EMBEDDING:
   MODEL: "nomic-embed-text-v1.5"
-  DIMENSION: 128
+  DIMENSION: 64
   PRE_PRECISION: 2
 
 INPUT_DIRS:
@@ -45,7 +45,7 @@ MODEL:
   CONV_CHANNELS: 128
   HIDDEN_DIM: 64
   INPUT_CHANNELS: 12
-  LEARNING_RATE: 0.001
+  LEARNING_RATE: 0.007
   BATCH_SIZE: 32
   NUM_EPOCHS: 10
   DEVICE: "cuda"  # Options: "cuda", "cpu", "auto" (auto-detect)

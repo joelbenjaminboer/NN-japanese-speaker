@@ -139,7 +139,7 @@ def train_model(
     device: str = "cpu",
 ) -> dict:
     """Train the model and return training history."""
-    learning_rate = model_cfg.get("LEARNING_RATE", 0.001)
+    learning_rate = model_cfg.get("LEARNING_RATE", 0.007)
     num_epochs = model_cfg.get("NUM_EPOCHS", 10)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
