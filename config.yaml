@@ -53,15 +53,15 @@ MODEL:
   DEVICE: "cuda"  # Options: "cuda", "cpu", "auto" (auto-detect)
 
 OPTUNA:
-  ENABLED: true
+  ENABLED: false
   N_TRIALS: 50
   STUDY_NAME: "HAIKU_speaker_recognition"
   FIGURES_DIR: "reports/optuna/figures"
   STUDY_DIR: "reports/optuna/study"
   BEST_CONFIG_DIR: "reports/optuna/best_config"
   RANGES:
-    LEARNING_RATE: [1e-5, 1e-2]
-    DROPOUT: [0.1, 0.5]
+    LEARNING_RATE: [1e-5, 1e-2] # low, high
+    DROPOUT: [0.1, 0.5] # low, high
     CONV_CHANNELS: [64, 128, 256]
     HIDDEN_DIM: [32, 64, 128]
     KERNEL_SIZE: [3, 5, 7]
