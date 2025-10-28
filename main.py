@@ -1,9 +1,9 @@
 from __future__ import annotations
-import numpy as np
+
 from pathlib import Path
 from typing import Any
-import matplotlib.pyplot as plt
 
+import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import yaml
@@ -11,6 +11,7 @@ from torch.utils.data import TensorDataset
 from japanese_speaker_recognition.data_augmentation import AugmentationPipeline
 from japanese_speaker_recognition.dataset import JapaneseVowelsDataset
 from japanese_speaker_recognition.models.HAIKU import HAIKU
+from japanese_speaker_recognition.optimization.optuna_tuner import OptunaTuner
 from utils.utils import heading
 
 
@@ -78,6 +79,41 @@ def main():
             print(f"{k:15s} -> shape={v.shape}")
         else:
             print(f"{k:15s} -> {v}")
+    
+    print(f"x_train shape: {x_train.shape}")
+    print(f"y_train shape: {y_train.shape}")
+    print(f"x_val shape: {x_val.shape}")
+    print(f"y_val shape: {y_val.shape}")
+
+    if cfg.get("OPTUNA", {}).get("ENABLED", False):
+        tuner = OptunaTuner(
+            x_train=x_train,
+            y_train=y_train,
+            x_val=x_val,
+            y_val=y_val,
+            base_config=cfg,
+            n_trials=cfg.get("OPTUNA", {}).get("N_TRIALS", 50),
+            study_name=cfg.get("OPTUNA", {}).get("STUDY_NAME", "HAIKU_speaker_recognition"),
+            seed=cfg.get("SEED", 42),
+        )
+
+        study = tuner.optimize()
+
+        figures_dir = Path(cfg.get("OPTUNA", {}).get("FIGURES_DIR", "reports/optuna/figures"))
+        study_dir = Path(cfg.get("OPTUNA", {}).get("STUDY_DIR", "reports/optuna/study"))
+        best_config_dir = Path(cfg.get("OPTUNA", {}).get("BEST_CONFIG_DIR", "reports/optuna/best_config"))
+
+        figures_dir.mkdir(parents=True, exist_ok=True)
+        study_dir.mkdir(parents=True, exist_ok=True)
+        best_config_dir.mkdir(parents=True, exist_ok=True)
+
+        tuner.save_plots(output_dir=figures_dir)
+        tuner.save_study(output_dir=study_dir)
+
+        model_cfg = tuner.get_best_config()
+        # save the config
+        with open(best_config_dir / "best_model_config.yaml", "w") as f:
+            yaml.dump(model_cfg, f)
 
     # Get model config and create model
     heading("Model Creation")
@@ -88,8 +124,6 @@ def main():
     batch_size = model_cfg.get("BATCH_SIZE", 32)
     embedding_dim = model_cfg.get("EMBEDDING_DIM", 64)
     input_channels = model_cfg.get("INPUT_CHANNELS", 12)
-
-    #print_model_summary( model,input_shape=(batch_size, input_channels, embedding_dim))
 
     # Train the model
     history = model.train_model(

@@ -1,14 +1,13 @@
-from typing import Self
-
-from numpy import ndarray
+from typing import Any, Self
 
 import torch
 import torch.nn as nn
+from torch import Tensor
 from torch.nn.modules.container import Sequential
 from torch.nn.modules.pooling import AdaptiveAvgPool1d
 from torch.utils.data import DataLoader, TensorDataset
 from typing_extensions import override
-from sklearn.model_selection import KFold
+from tqdm import tqdm
 
 from utils.utils import heading
 
@@ -102,7 +101,7 @@ class HAIKU(nn.Module):
         return x.squeeze(-1)  # [B, 128]
 
     @classmethod
-    def _from_config(cls, config: dict[str, int | float]) -> Self:
+    def _from_config(cls, config: dict[str, int | float | str]) -> Self:
         """
         Create SpeakerCNN from configuration dictionary.
         Args:
@@ -154,9 +153,9 @@ class HAIKU(nn.Module):
 
     @classmethod
     def create_model(cls, model_cfg: dict) -> Self:
-        """Create CNN model from configuration."""
+        """Create HAIKU model from configuration."""
         model = cls._from_config(model_cfg)
-        
+
         total_params = sum(p.numel() for p in model.parameters())
         trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
@@ -225,6 +224,11 @@ class HAIKU(nn.Module):
                 fold_history["val_loss"].append(val_loss)
                 fold_history["val_acc"].append(val_acc)
 
+            tqdm.write(
+                f"Epoch [{epoch + 1}/{num_epochs}] "
+                f"Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.2f}% | "
+                f"Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.2f}%"
+            )
                 print(
                     f"Epoch [{epoch + 1}/{num_epochs}] "
                     f"Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.2f}% | "
