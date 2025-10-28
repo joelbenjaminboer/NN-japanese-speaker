@@ -1,14 +1,16 @@
 from __future__ import annotations
-
+import numpy as np
 from pathlib import Path
 from typing import Any
+import matplotlib.pyplot as plt
 
-import yaml
 import torch
-
+import torch.nn as nn
+import yaml
+from torch.utils.data import TensorDataset
 from japanese_speaker_recognition.data_augmentation import AugmentationPipeline
 from japanese_speaker_recognition.dataset import JapaneseVowelsDataset
-from japanese_speaker_recognition.models.cnn import SpeakerCNN
+from japanese_speaker_recognition.models.HAIKU import HAIKU
 from utils.utils import heading
 
 
@@ -18,6 +20,28 @@ def load_config(path: str | Path = "config.yaml") -> dict[str, Any]:
         raise FileNotFoundError(f"Config not found: {p.resolve()}")
     with p.open("r", encoding="utf-8") as f:
         return yaml.safe_load(f) or {}
+
+def print_model_summary(model: nn.Module, input_shape: tuple):
+    """Print detailed model architecture."""
+    heading("Model Architecture")
+    print(model)
+
+    heading("Layer-by-layer output shapes")
+    dummy_input = torch.randn(*input_shape)
+    model.eval()
+
+    with torch.no_grad():
+        x = dummy_input
+        print(f"Input: {x.shape}")
+
+        x = model.conv(x)
+        print(f"After Conv: {x.shape}")
+
+        x = model.global_pool(x)
+        print(f"After Global Pool: {x.shape}")
+
+        logits = model.classifier(x)
+        print(f"After Classifier (MLP): {logits.shape}")
 
 
 def main():
@@ -35,7 +59,18 @@ def main():
     heading("Preparing dataset")
     ds = JapaneseVowelsDataset(cfg, augmenter=augmenter)
     artifacts = ds.prepare()
+    x_train = artifacts["X_train"]
+    y_train = artifacts["y_train"]
+    x_test = artifacts["X_test"]
+    y_test = artifacts["y_test"]
+    
+    
 
+    x_train = torch.tensor(x_train, dtype=torch.float32)  # Shape: [B, 12, 64]
+    y_train = torch.tensor(y_train, dtype=torch.long)     # Shape: [B, ]    
+    x_test = torch.tensor(x_test, dtype=torch.float32)
+    y_test = torch.tensor(y_test, dtype=torch.long)
+    
     # quick summary (shapes + file outputs)
     heading("Artifacts")
     for k, v in artifacts.items():
@@ -43,72 +78,60 @@ def main():
             print(f"{k:15s} -> shape={v.shape}")
         else:
             print(f"{k:15s} -> {v}")
-    
-    # ========== Simple CNN Model Usage (Original) ==========
-    
-    heading("Simple CNN Model - Basic Usage")
-    
-    model = SpeakerCNN(num_classes=9, dropout=0.3)
-    print(f"Model architecture:")
-    print(f"  - Input: [Batch, 12 features, 64 embedding_dim]")
-    print(f"  - Conv layers: 12→32→64→128 channels")
-    print(f"  - Kernel sizes: [3, 5, 5]")
-    print(f"  - Pooling: MaxPool after 2nd and 3rd conv")
-    print(f"  - Output: [Batch, 9 classes]")
-    print(f"  - Total parameters: {sum(p.numel() for p in model.parameters()):,}")
-    
-    # Example: Forward pass with dummy data
-    heading("Forward Pass Example")
-    batch_size = 8
-    dummy_input = torch.randn(batch_size, 12, 64)
-    
-    print(f"Input shape: {dummy_input.shape}")
-    
-    # Get predictions
-    model.eval()
-    with torch.no_grad():
-        logits = model(dummy_input)
-        probabilities = torch.softmax(logits, dim=1)
-        predictions = torch.argmax(probabilities, dim=1)
-    
-    print(f"Output logits shape: {logits.shape}")
-    print(f"Probabilities shape: {probabilities.shape}")
-    print(f"Predictions shape: {predictions.shape}")
-    print(f"Sample predictions: {predictions[:5].tolist()}")
-    
-    # Example: Extract features (without classification)
-    heading("Feature Extraction Example")
-    with torch.no_grad():
-        features = model.extract_features(dummy_input)
-    
-    print(f"Extracted features shape: {features.shape}")
-    print(f"Features are 128-dim representations for each sample")
-    
-    # Example: Training mode
-    heading("Training Setup Example")
-    model.train()
-    
-    # Setup optimizer and loss
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-    criterion = torch.nn.CrossEntropyLoss()
-    
-    # Dummy training step
-    dummy_labels = torch.randint(0, 9, (batch_size,))
-    
-    optimizer.zero_grad()
-    outputs = model(dummy_input)
-    loss = criterion(outputs, dummy_labels)
-    loss.backward()
-    optimizer.step()
-    
-    print(f"Loss function: CrossEntropyLoss")
-    print(f"Optimizer: Adam (lr=0.001)")
-    print(f"Sample loss: {loss.item():.4f}")
-    
-    # Example: Model summary
-    heading("Model Architecture Details")
-    print(model)
 
+    # Get model config and create model
+    heading("Model Creation")
+    model_cfg = cfg.get("MODEL", {})
+    model = HAIKU.create_model(model_cfg)
+    
+    # Print detailed model summary
+    batch_size = model_cfg.get("BATCH_SIZE", 32)
+    embedding_dim = model_cfg.get("EMBEDDING_DIM", 64)
+    input_channels = model_cfg.get("INPUT_CHANNELS", 12)
 
+    #print_model_summary( model,input_shape=(batch_size, input_channels, embedding_dim))
+
+    # Train the model
+    history = model.train_model(
+        x_train,
+        y_train,
+        learning_rate = model_cfg.get("LEARNING_RATE", 0.001),
+        num_epochs = model_cfg.get("NUM_EPOCHS", 500),
+        batch_size = batch_size,
+        k_folds = model_cfg.get("K_FOLDS", 10),
+    )
+    
+    # plot the training history
+    heading("Training History")
+    epochs = range(1, len(history["train_loss"]) + 1)
+    plt.figure(figsize=(12, 5))
+    plt.subplot(1, 2, 1)
+    plt.plot(epochs, history["train_loss"], label="Train Loss")
+    plt.plot(epochs, history["val_loss"], label="Val Loss")
+    plt.xlabel("Epochs")
+    plt.ylabel("Loss")
+    plt.title("Loss over Epochs")
+    plt.legend()
+    plt.subplot(1, 2, 2)
+    plt.plot(epochs, history["train_acc"], label="Train Acc")
+    plt.plot(epochs, history["val_acc"], label="Val Acc")
+    plt.xlabel("Epochs")
+    plt.ylabel("Accuracy (%)")
+    plt.title("Accuracy over Epochs")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig("training_history.png")
+    
+    # Print final results
+    heading("Training Complete")
+    print(f"Final Train Accuracy: {history['train_acc'][-1][-1]:.2f}%")
+    print(f"Final Validation Accuracy: {history['val_acc'][-1][-1]:.2f}%")
+    
+    # evaluate on test set
+    test_set = TensorDataset(x_test, y_test)
+    test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False)
+    avg_loss, test_acc = model.evaluate(test_loader, criterion=nn.CrossEntropyLoss())
+    print(f"Test Set Accuracy: {test_acc:.2f}%")
+    print(f"Test Set Loss: {avg_loss:.4f}")
 if __name__ == "__main__":
     main()

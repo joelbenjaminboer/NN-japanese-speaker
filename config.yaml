@@ -9,7 +9,7 @@ MAX_LEN: 29  # longest utterance length (7–29)
 N_FEATURES: 12
 
 AUGMENTATION:
-  AUGMENT: true
+  AUGMENT: false
   REPEATS: 100
   AUG_FILE: "data/augmented_data.npz"
   SEED: 42
@@ -24,6 +24,12 @@ AUGMENTATION:
     # - type: frequency_masking
     #   max_mask_percentage: 0.01
 
+EMBEDDING:
+  MODEL: "nomic-embed-text-v1.5"
+  DIMENSION: 64
+  PRE_PRECISION: 2
+  OUTPUT_FILE: "data/processed_data/"
+
 INPUT_DIRS:
   TRAIN_FILE: "data/ae.train"
   TEST_FILE: "data/ae.test"
@@ -31,11 +37,17 @@ INPUT_DIRS:
 OUTPUT_DIRS:
   PROCESSED: "data/processed_data"
 
-#MODELS
-CNN:
-  NUM_CLASSES: 9  # Number of speakers
+#HAIKU
+MODEL:
+  NUM_CLASSES: 9
   DROPOUT: 0.3
-  CONV_CHANNELS: [32, 64, 128]  # Channel sizes for each conv layer
-  KERNEL_SIZES: [3, 5, 5]  # Kernel sizes for each conv layer
-  POOLING: [1, 2, 2]  # Pooling stride (1 = no pooling, 2 = MaxPool with stride 2)
-  MLP_HIDDEN: 64  # Hidden layer size in classifier
+  EMBEDDING_DIM: 64
+  KERNEL_SIZE: 3
+  CONV_CHANNELS: 128
+  HIDDEN_DIM: 64
+  INPUT_CHANNELS: 12
+  LEARNING_RATE: 0.007
+  BATCH_SIZE: 32
+  NUM_EPOCHS: 500
+  KFOLDS: 10
+  DEVICE: "cuda"  # Options: "cuda", "cpu", "auto" (auto-detect)
