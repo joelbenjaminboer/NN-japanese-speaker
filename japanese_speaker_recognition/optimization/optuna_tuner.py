@@ -2,10 +2,8 @@ from pathlib import Path
 from typing import Any, Literal
 
 import optuna
-import pytest
-import torch
 from optuna import Study, Trial
-from torch import Tensor, dropout_
+from torch import Tensor
 
 from japanese_speaker_recognition.models.HAIKU import HAIKU
 from utils.utils import heading
@@ -30,7 +28,9 @@ class OptunaTuner:
         self.study: Study | None = None
 
     @staticmethod
-    def _tuning_ranges_from_config(config: dict[str, Any]) -> dict[str, tuple[float, float] | list[int]]:
+    def _tuning_ranges_from_config(
+        config: dict[str, Any]
+        ) -> dict[str, tuple[float, float] | list[int]]:
         """requires only the ranges part of the yaml config"""
         learning_rate_raw = list[float](config.get("LEARNING_RATE", [1e-5, 1e-2]))
         dropout_raw = list[float](config.get("DROPOUT", [0.1, 0.5]))
@@ -64,15 +64,30 @@ class OptunaTuner:
         dropout_high = float(suggested_params["DROPOUT"][1])
 
         return {
-            "LEARNING_RATE": trial.suggest_float("LEARNING_RATE", learning_rate_low, learning_rate_high, log=True),
-            "DROPOUT": trial.suggest_float("DROPOUT", dropout_low, dropout_high),
-            "CONV_CHANNELS": trial.suggest_categorical("CONV_CHANNELS", suggested_params["CONV_CHANNELS"]),
-            "HIDDEN_DIM": trial.suggest_categorical("HIDDEN_DIM", suggested_params["HIDDEN_DIM"]),
-            "KERNEL_SIZE": trial.suggest_categorical("KERNEL_SIZE", suggested_params["KERNEL_SIZE"]),
-            "BATCH_SIZE": trial.suggest_categorical("BATCH_SIZE", suggested_params["BATCH_SIZE"]),
+            "LEARNING_RATE": trial.suggest_float(
+                "LEARNING_RATE", learning_rate_low, learning_rate_high, log=True
+            ),
+            "DROPOUT": trial.suggest_float(
+                "DROPOUT", dropout_low, dropout_high
+            ),
+            "CONV_CHANNELS": trial.suggest_categorical(
+                "CONV_CHANNELS", suggested_params["CONV_CHANNELS"]
+            ),
+            "HIDDEN_DIM": trial.suggest_categorical(
+                "HIDDEN_DIM", suggested_params["HIDDEN_DIM"]
+            ),
+            "KERNEL_SIZE": trial.suggest_categorical(
+                "KERNEL_SIZE", suggested_params["KERNEL_SIZE"]
+            ),
+            "BATCH_SIZE": trial.suggest_categorical(
+                "BATCH_SIZE", suggested_params["BATCH_SIZE"]
+            ),
         }
 
-    def _create_model_config(self, suggested_params: dict[str, int | float]) -> dict[str, int | float | str]:
+    def _create_model_config(
+        self,
+        suggested_params: dict[str, int | float]
+        ) -> dict[str, int | float | str]:
         """Creates the model config from the suggested hyperparameters."""
         model_config = self.base_config.get("MODEL", {})
 
@@ -170,8 +185,6 @@ class OptunaTuner:
 
         
         try:
-            import plotly 
-
             # Optimization history
             fig = optuna.visualization.plot_optimization_history(self.study)
             fig.write_image(output_dir / "optuna_optimization_history.png")

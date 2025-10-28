@@ -1,14 +1,14 @@
-from typing import Any, Self
+from typing import Self
 
 import torch
 import torch.nn as nn
+from sklearn.model_selection import KFold
 from torch import Tensor
 from torch.nn.modules.container import Sequential
 from torch.nn.modules.pooling import AdaptiveAvgPool1d
 from torch.utils.data import DataLoader, TensorDataset
-from typing_extensions import override
 from tqdm import tqdm
-from sklearn.model_selection import KFold
+from typing_extensions import override
 
 from utils.utils import heading
 
@@ -190,7 +190,8 @@ class HAIKU(nn.Module):
 
         self.to(self.device)
 
-        heading(f"Training for {num_epochs} epochs with {k_folds}-fold cross-validation (lr={learning_rate}, device={self.device})")
+        heading(f"Training for {num_epochs} epochs with {k_folds}-fold cross-validation \
+            (lr={learning_rate}, device={self.device})")
 
         # Cross-validation loop
         for fold, (train_idx, val_idx) in enumerate(kf.split(x_train)):

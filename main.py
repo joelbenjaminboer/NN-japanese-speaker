@@ -8,6 +8,7 @@ import torch
 import torch.nn as nn
 import yaml
 from torch.utils.data import TensorDataset
+
 from japanese_speaker_recognition.data_augmentation import AugmentationPipeline
 from japanese_speaker_recognition.dataset import JapaneseVowelsDataset
 from japanese_speaker_recognition.models.HAIKU import HAIKU
@@ -44,6 +45,27 @@ def print_model_summary(model: nn.Module, input_shape: tuple):
         logits = model.classifier(x)
         print(f"After Classifier (MLP): {logits.shape}")
 
+def plot_training_history(history: dict) -> None:
+    """Plot training history."""
+    heading("Training History")
+    epochs = range(1, len(history["train_loss"]) + 1)
+    plt.figure(figsize=(12, 5))
+    plt.subplot(1, 2, 1)
+    plt.plot(epochs, history["train_loss"], label="Train Loss")
+    plt.plot(epochs, history["val_loss"], label="Val Loss")
+    plt.xlabel("Epochs")
+    plt.ylabel("Loss")
+    plt.title("Loss over Epochs")
+    plt.legend()
+    plt.subplot(1, 2, 2)
+    plt.plot(epochs, history["train_acc"], label="Train Acc")
+    plt.plot(epochs, history["val_acc"], label="Val Acc")
+    plt.xlabel("Epochs")
+    plt.ylabel("Accuracy (%)")
+    plt.title("Accuracy over Epochs")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig("training_history.png")
 
 def main():
     # Load the config and print current settings
@@ -90,11 +112,17 @@ def main():
             seed=cfg.get("SEED", 42),
         )
 
-        study = tuner.optimize()
+        _ = tuner.optimize()
 
-        figures_dir = Path(cfg.get("OPTUNA", {}).get("FIGURES_DIR", "reports/optuna/figures"))
-        study_dir = Path(cfg.get("OPTUNA", {}).get("STUDY_DIR", "reports/optuna/study"))
-        best_config_dir = Path(cfg.get("OPTUNA", {}).get("BEST_CONFIG_DIR", "reports/optuna/best_config"))
+        figures_dir = Path(
+            cfg.get("OPTUNA", {}).get("FIGURES_DIR", "reports/optuna/figures")
+            )
+        study_dir = Path(
+            cfg.get("OPTUNA", {}).get("STUDY_DIR", "reports/optuna/study")
+            )
+        best_config_dir = Path(
+            cfg.get("OPTUNA", {}).get("BEST_CONFIG_DIR", "reports/optuna/best_config")
+            )
 
         figures_dir.mkdir(parents=True, exist_ok=True)
         study_dir.mkdir(parents=True, exist_ok=True)
@@ -115,8 +143,6 @@ def main():
     
     # Print detailed model summary
     batch_size = model_cfg.get("BATCH_SIZE", 32)
-    embedding_dim = model_cfg.get("EMBEDDING_DIM", 64)
-    input_channels = model_cfg.get("INPUT_CHANNELS", 12)
 
     # Train the model
     history = model.train_model(
@@ -129,25 +155,7 @@ def main():
     )
     
     # plot the training history
-    heading("Training History")
-    epochs = range(1, len(history["train_loss"]) + 1)
-    plt.figure(figsize=(12, 5))
-    plt.subplot(1, 2, 1)
-    plt.plot(epochs, history["train_loss"], label="Train Loss")
-    plt.plot(epochs, history["val_loss"], label="Val Loss")
-    plt.xlabel("Epochs")
-    plt.ylabel("Loss")
-    plt.title("Loss over Epochs")
-    plt.legend()
-    plt.subplot(1, 2, 2)
-    plt.plot(epochs, history["train_acc"], label="Train Acc")
-    plt.plot(epochs, history["val_acc"], label="Val Acc")
-    plt.xlabel("Epochs")
-    plt.ylabel("Accuracy (%)")
-    plt.title("Accuracy over Epochs")
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig("training_history.png")
+    plot_training_history(history)
     
     # Print final results
     heading("Training Complete")
