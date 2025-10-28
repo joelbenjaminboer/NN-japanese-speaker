@@ -8,6 +8,7 @@ from torch.nn.modules.pooling import AdaptiveAvgPool1d
 from torch.utils.data import DataLoader, TensorDataset
 from typing_extensions import override
 from tqdm import tqdm
+from sklearn.model_selection import KFold
 
 from utils.utils import heading
 
@@ -175,8 +176,8 @@ class HAIKU(nn.Module):
 
     def train_model(
         self,
-        x_train: ndarray,
-        y_train: ndarray,
+        x_train: Tensor,
+        y_train: Tensor,
         learning_rate: float = 0.007,
         num_epochs: int = 10,
         batch_size: int = 32,
@@ -224,12 +225,7 @@ class HAIKU(nn.Module):
                 fold_history["val_loss"].append(val_loss)
                 fold_history["val_acc"].append(val_acc)
 
-            tqdm.write(
-                f"Epoch [{epoch + 1}/{num_epochs}] "
-                f"Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.2f}% | "
-                f"Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.2f}%"
-            )
-                print(
+                tqdm.write(
                     f"Epoch [{epoch + 1}/{num_epochs}] "
                     f"Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.2f}% | "
                     f"Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.2f}%"

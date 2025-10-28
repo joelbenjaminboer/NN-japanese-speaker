@@ -16,8 +16,6 @@ class OptunaTuner:
         self,
         x_train: Tensor,
         y_train: Tensor,
-        x_val: Tensor,
-        y_val: Tensor,
         base_config: dict[str, Any],
         n_trials: int = 50,
         study_name: str = "HAIKU_speaker_recognition",
@@ -25,8 +23,6 @@ class OptunaTuner:
     ):
         self.x_train = x_train
         self.y_train = y_train
-        self.x_val = x_val
-        self.y_val = y_val
         self.base_config = base_config
         self.n_trials = n_trials
         self.study_name = study_name
@@ -101,14 +97,12 @@ class OptunaTuner:
         history = model.train_model(
             x_train=self.x_train,
             y_train=self.y_train,
-            x_val=self.x_val,
-            y_val=self.y_val,
             learning_rate=suggested_params["LEARNING_RATE"],
             num_epochs=num_epochs,
             batch_size=int(suggested_params["BATCH_SIZE"]),
         )
 
-        best_val_acc = max(history["val_acc"])
+        best_val_acc = max(history["val_acc"][-1])
         print(f"Best validation accuracy: {best_val_acc:.4f}")
         return best_val_acc
 

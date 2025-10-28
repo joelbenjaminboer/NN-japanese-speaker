@@ -79,18 +79,11 @@ def main():
             print(f"{k:15s} -> shape={v.shape}")
         else:
             print(f"{k:15s} -> {v}")
-    
-    print(f"x_train shape: {x_train.shape}")
-    print(f"y_train shape: {y_train.shape}")
-    print(f"x_val shape: {x_val.shape}")
-    print(f"y_val shape: {y_val.shape}")
 
     if cfg.get("OPTUNA", {}).get("ENABLED", False):
         tuner = OptunaTuner(
             x_train=x_train,
             y_train=y_train,
-            x_val=x_val,
-            y_val=y_val,
             base_config=cfg,
             n_trials=cfg.get("OPTUNA", {}).get("N_TRIALS", 50),
             study_name=cfg.get("OPTUNA", {}).get("STUDY_NAME", "HAIKU_speaker_recognition"),
@@ -167,5 +160,6 @@ def main():
     avg_loss, test_acc = model.evaluate(test_loader, criterion=nn.CrossEntropyLoss())
     print(f"Test Set Accuracy: {test_acc:.2f}%")
     print(f"Test Set Loss: {avg_loss:.4f}")
+
 if __name__ == "__main__":
     main()
