@@ -1,19 +1,16 @@
 import time
-import os
+
 import numpy as np
 from nomic import embed
 
+
 class EmbeddingPipeline:
-    
     def __init__(
         self,
         timeseries: list[np.ndarray],
         model_name: str = "nomic-embed-text-v1.5",
         dimension: int = 64,
         precision: int = 2,
-        test_dir: str = "data/processed_data/",
-        train_dir: str = "data/processed_data/",
-        key: str = None,
     ) -> None:
         """
         Embedding pipeline for a list of utterances (each np.ndarray of shape (12, T_i)).
@@ -27,35 +24,14 @@ class EmbeddingPipeline:
         self.dimension = dimension
         self.precision = precision
         self.original_timeseries = timeseries
-        
-        if not os.path.exists(os.path.join(test_dir, f"test_{key}_fused.npy")):
-            # Run the embedding pipeline
-            self.processed_timeseries = [self._preprocess_timeseries(utt) for utt in timeseries]
-            self.embeddings = self._embed(self.processed_timeseries)
-            self.fused = [
-                self._fuse_embeddings_timeseries(utt, emb)
-                for utt, emb in zip(timeseries, self.embeddings, strict=True)
-            ]
-            # Save fused representations
-            np.save(os.path.join(test_dir, f"test_{key}_fused.npy"), self.fused)
-        else:
-            print("Fused representations already exist.")
-            self.fused = np.load(os.path.join(test_dir, f"test_{key}_fused.npy"), allow_pickle=True)
-        
-        if not os.path.exists(os.path.join(train_dir, f"test_{key}_fused.npy")):
-            # Run the embedding pipeline
-            self.processed_timeseries = [self._preprocess_timeseries(utt) for utt in timeseries]
-            self.embeddings = self._embed(self.processed_timeseries)
-            self.fused = [
-                self._fuse_embeddings_timeseries(utt, emb)
-                for utt, emb in zip(timeseries, self.embeddings, strict=True)
-            ]
-            # Save fused representations
-            np.save(os.path.join(train_dir, f"train_{key}_fused.npy"), self.fused)
-        else:
-            print("Fused representations already exist.")
-            self.fused = np.load(os.path.join(train_dir, f"train_{key}_fused.npy"), allow_pickle=True)
 
+        # Run the embedding pipeline
+        self.processed_timeseries = [self._preprocess_timeseries(utt) for utt in timeseries]
+        self.embeddings = self._embed(self.processed_timeseries)
+        self.fused = [
+            self._fuse_embeddings_timeseries(utt, emb)
+            for utt, emb in zip(timeseries, self.embeddings, strict=True)
+        ]
 
     # -----------------------------
     # Step 1: preprocessing
@@ -88,7 +64,7 @@ class EmbeddingPipeline:
         n_channels = len(processed_utterances[0])
 
         all_embs = []
-        batch_size = 100
+        batch_size = 100  # <= recommended by Nomic
         for i in range(0, len(all_texts), batch_size):
             chunk = all_texts[i : i + batch_size]
 

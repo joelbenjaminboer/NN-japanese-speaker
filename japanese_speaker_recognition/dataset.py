@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from urllib.request import urlretrieve
-
+import os
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 
@@ -19,9 +19,8 @@ class DatasetPaths:
     data_url: str
     train_file: Path
     test_file: Path
-    out_dir: Path
+    out_dir: Path 
     aug_file: Path | None = None
-
 
 class JapaneseVowelsDataset:
     """
@@ -44,14 +43,20 @@ class JapaneseVowelsDataset:
         embedding_dim: int = 64,
         embedding_model: str = "nomic-embed-text-v1.5",
         embedidng_precision: int = 2,
+        key: str | None = None,
     ) -> None:
         self.cfg = cfg
         self.augmenter = augmenter
+        if key is None:
+            self.key = "default"
+        else:
+            self.key = key
 
         # ---- Embedding config ----
         self.embedding_dim = embedding_dim
         self.embedding_model = embedding_model
         self.embedding_precision = embedidng_precision
+        
 
         # ---- Parse config ----
         data_url = cfg.get("DATA_URL", "").rstrip("/") + "/"
@@ -82,6 +87,9 @@ class JapaneseVowelsDataset:
         )
         self.paths = paths
         self.paths.out_dir.mkdir(parents=True, exist_ok=True)
+        
+        self.train_npz = self.paths.out_dir / f"train_{self.key}_data.npz"
+        self.test_npz = self.paths.out_dir / f"test_{self.key}_data.npz"
 
         self.scaler: StandardScaler | None = None  # fitted on train
 
@@ -144,63 +152,80 @@ class JapaneseVowelsDataset:
         train_utts, test_utts = self._minmax_normalize_train_test(train_utts, test_utts)
 
         # --------------------------
-        # Embedding (includes fusion)
+        # Checking if file exists else embedding and saving
         # --------------------------
+        print(self.paths.out_dir)
         print("Embedding training utterances...")
-        train_embedder = EmbeddingPipeline(
-            timeseries=train_utts,
-            model_name=self.embedding_model,
-            dimension=self.embedding_dim,
-            precision=self.embedding_precision,
-        )
-
-        print("Embedding test utterances...")
-        test_embedder = EmbeddingPipeline(
-            timeseries=test_utts,
-            model_name=self.embedding_model,
-            dimension=self.embedding_dim,
-            precision=self.embedding_precision,
-        )
-
-        X_train = np.stack(train_embedder.get_fused)
-        X_test = np.stack(test_embedder.get_fused)
-
-        print(f"Embedded X_train shape: {X_train.shape}")
-        print(f"Embedded X_test shape: {X_test.shape}")
-
-        # --------------------------
-        # Step 5: Labels
-        # --------------------------
-        y_train = self._generate_train_labels()
-        y_test = self._generate_test_labels()
-
-        # --------------------------
-        # Save all outputs
-        # --------------------------
-        train_npz = self.paths.out_dir / "train_data.npz"
-        test_npz = self.paths.out_dir / "test_data.npz"
-
-        np.savez_compressed(train_npz, X_train=X_train, y_train=y_train)
-        np.savez_compressed(test_npz, X_test=X_test, y_test=y_test)
-
-        out = {
+        if not os.path.exists(self.train_npz):
+            train_embedder = EmbeddingPipeline(
+                timeseries=train_utts,
+                model_name=self.embedding_model,
+                dimension=self.embedding_dim,
+                precision=self.embedding_precision,
+            )
+            test_embedder = EmbeddingPipeline(
+                timeseries=test_utts,
+                model_name=self.embedding_model,
+                dimension=self.embedding_dim,
+                precision=self.embedding_precision,
+            )
+            
+            X_train = train_embedder.get_fused
+            X_test = test_embedder.get_fused
+            
+            y_train = self._generate_train_labels()
+            y_test = self._generate_test_labels()
+            
+            np.savez_compressed(self.train_npz, X_train=X_train, y_train=y_train)
+            np.savez_compressed(self.test_npz, X_test=X_test, y_test=y_test)
+            
+            out = {
             "X_train": X_train,
             "y_train": y_train,
             "X_test": X_test,
             "y_test": y_test,
-            "train_npz": str(train_npz),
-            "test_npz": str(test_npz),
-        }
+            "train_npz": str(self.train_npz),
+            "test_npz": str(self.test_npz),
+            }
 
-        if self.pipeline_flags["augment"] and self.aug_enable and self.aug_repeats > 0:
-            out.update(
-                {
-                    "X_augmented": X_train[-len(y_aug) :],
-                    "y_augmented": y_aug,
-                }
-            )
+            if self.pipeline_flags["augment"] and self.aug_enable and self.aug_repeats > 0:
+                out.update(
+                    {
+                        "X_augmented": X_train[-len(y_aug) :],
+                        "y_augmented": y_aug,
+                    }
+                )
 
-        return out
+            return out
+
+        # if artifacts exist, load and return them
+        else:
+            print(f"Loading existing embeddings from: {self.train_npz}")
+            print(f"Loading existing embeddings from: {self.test_npz}")
+            
+            X_train = np.load(self.train_npz)["X_train"]
+            X_test = np.load(self.test_npz)["X_test"]
+            y_train = np.load(self.train_npz)["y_train"]
+            y_test = np.load(self.test_npz)["y_test"]
+            
+            out = {
+            "X_train": X_train,
+            "y_train": y_train,
+            "X_test": X_test,
+            "y_test": y_test,
+            "train_npz": str(self.train_npz),
+            "test_npz": str(self.test_npz),
+            }
+            
+            if self.pipeline_flags["augment"] and self.aug_enable and self.aug_repeats > 0:
+                out.update(
+                    {
+                        "X_augmented": X_train[-len(y_aug) :],
+                        "y_augmented": y_aug,
+                    }
+                )
+
+            return out
 
     # --------------------------
     # Steps (private)
@@ -320,9 +345,8 @@ class JapaneseVowelsDataset:
             labels += [speaker_id] * utterances_per_speaker
         return np.array(labels, dtype=int)
 
-    @staticmethod
-    def _generate_test_labels() -> np.ndarray:
-        block_sizes = [31, 35, 88, 44, 29, 24, 40, 50, 29]  # per speaker 1–9
+    def _generate_test_labels(self) -> np.ndarray:
+        block_sizes = [31, 35, 88, 44, 29, 24, 40, 50, 29]
         labels: list[int] = []
         for speaker_id, n in enumerate(block_sizes):
             labels += [speaker_id] * n
@@ -333,5 +357,5 @@ class JapaneseVowelsDataset:
         if not self.augmenter or repeats <= 0:
             return np.empty((0, *X_train.shape[1:])), np.empty((0,), dtype=y_train.dtype)
         X_aug, idx_map = self.augmenter.run(X_train, repeats=repeats)
-        y_aug = np.tile(y_train, repeats)  # keeps label-per-sample semantics
+        y_aug = np.tile(y_train, repeats)
         return X_aug, y_aug

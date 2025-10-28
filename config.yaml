@@ -28,6 +28,7 @@ EMBEDDING:
   MODEL: "nomic-embed-text-v1.5"
   DIMENSION: 64
   PRE_PRECISION: 2
+  OUTPUT_FILE: "data/processed_data/"
 
 INPUT_DIRS:
   TRAIN_FILE: "data/ae.train"
