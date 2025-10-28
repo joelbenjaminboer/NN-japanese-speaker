@@ -7,6 +7,7 @@ from torch.nn.modules.container import Sequential
 from torch.nn.modules.pooling import AdaptiveAvgPool1d
 from torch.utils.data import DataLoader, TensorDataset
 from typing_extensions import override
+from tqdm import tqdm
 
 from utils.utils import heading
 
@@ -199,25 +200,29 @@ class HAIKU(nn.Module):
 
         heading(f"Training for {num_epochs} epochs (lr={learning_rate}, device={self.device})")
 
-        for epoch in range(num_epochs):
+        for epoch in tqdm(range(num_epochs), desc="Epochs", unit="epoch"):
             # Training
             train_loss, train_acc = self._train_step(train_loader, optimizer, criterion)
 
             # Validation
-            if epoch % 10 == 0 or epoch == num_epochs - 1:
-                val_loss, val_acc = self.evaluate(val_loader, criterion)
-                history["val_loss"].append(val_loss)
-                history["val_acc"].append(val_acc)
-            else:
-                val_loss, val_acc = 0.0, 0.0
-                history["val_loss"].append(val_loss)
-                history["val_acc"].append(val_acc)
+            val_loss, val_acc = self.evaluate(val_loader, criterion)
+            history["val_loss"].append(val_loss)
+            history["val_acc"].append(val_acc)
+            # Validation
+            # if epoch % 10 == 0 or epoch == num_epochs - 1:
+            #     val_loss, val_acc = self.evaluate(val_loader, criterion)
+            #     history["val_loss"].append(val_loss)
+            #     history["val_acc"].append(val_acc)
+            # else:
+            #     val_loss, val_acc = 0.0, 0.0
+            #     history["val_loss"].append(val_loss)
+            #     history["val_acc"].append(val_acc)
 
             # Store history
             history["train_loss"].append(train_loss)
             history["train_acc"].append(train_acc)
 
-            print(
+            tqdm.write(
                 f"Epoch [{epoch + 1}/{num_epochs}] "
                 f"Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.2f}% | "
                 f"Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.2f}%"
