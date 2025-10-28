@@ -24,7 +24,7 @@ dependencies = [
     "matplotlib>=3.10.7",
     "mypy>=1.18.2",
     "nomic>=3.6.0",
-    "numpy>=2.3.4",
+    "numpy<2",
     "optuna>=4.5.0",
     "plotly>=6.3.1",
     "pre-commit>=4.3.0",
@@ -33,7 +33,21 @@ dependencies = [
     "ruff>=0.14.1",
     "scikit-learn>=1.7.2",
     "sentence-transformers>=5.1.2",
-    "torch>=2.9.0",
+    "torch==2.2.0",
+    "torchvision==0.17.0"
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu121"
+url = "https://download.pytorch.org/whl/cu121"
+explicit = true
+
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-cu121", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
+torchvision = [
+  { index = "pytorch-cu121", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
 
 
