@@ -1,7 +1,8 @@
 from __future__ import annotations
-
+import numpy as np
 from pathlib import Path
 from typing import Any
+import matplotlib.pyplot as plt
 
 import torch
 import torch.nn as nn
@@ -9,7 +10,7 @@ import yaml
 
 from japanese_speaker_recognition.data_augmentation import AugmentationPipeline
 from japanese_speaker_recognition.dataset import JapaneseVowelsDataset
-from japanese_speaker_recognition.models.cnn import HAIKU
+from japanese_speaker_recognition.models.HAIKU import HAIKU
 from utils.utils import heading
 
 
@@ -62,7 +63,14 @@ def main():
     y_train = artifacts["y_train"]
     x_val = artifacts["X_test"]
     y_val = artifacts["y_test"]
+    
+    
 
+    x_train = torch.tensor(x_train, dtype=torch.float32)  # Shape: [B, 12, 64]
+    y_train = torch.tensor(y_train, dtype=torch.long)     # Shape: [B, ]    
+    x_val = torch.tensor(x_val, dtype=torch.float32)
+    y_val = torch.tensor(y_val, dtype=torch.long)
+    
     # quick summary (shapes + file outputs)
     heading("Artifacts")
     for k, v in artifacts.items():
@@ -70,6 +78,12 @@ def main():
             print(f"{k:15s} -> shape={v.shape}")
         else:
             print(f"{k:15s} -> {v}")
+    
+    print(f"x_train shape: {x_train.shape}")
+    print(f"y_train shape: {y_train.shape}")
+    print(f"x_val shape: {x_val.shape}")
+    print(f"y_val shape: {y_val.shape}")
+
 
     # Get model config and create model
     heading("Model Creation")
@@ -81,7 +95,7 @@ def main():
     embedding_dim = model_cfg.get("EMBEDDING_DIM", 64)
     input_channels = model_cfg.get("INPUT_CHANNELS", 12)
 
-    print_model_summary(model, (batch_size, input_channels, embedding_dim))
+    #print_model_summary( model,input_shape=(batch_size, input_channels, embedding_dim))
 
     # Train the model
     history = model.train_model(
@@ -93,36 +107,33 @@ def main():
         num_epochs=model_cfg.get("NUM_EPOCHS", 10),
         batch_size=model_cfg.get("BATCH_SIZE", 32)
     )
-
+    
+    # plot the training history
+    heading("Training History")
+    epochs = range(1, len(history["train_loss"]) + 1)
+    plt.figure(figsize=(12, 5))
+    plt.subplot(1, 2, 1)
+    plt.plot(epochs, history["train_loss"], label="Train Loss")
+    plt.plot(epochs, history["val_loss"], label="Val Loss")
+    plt.xlabel("Epochs")
+    plt.ylabel("Loss")
+    plt.title("Loss over Epochs")
+    plt.legend()
+    plt.subplot(1, 2, 2)
+    plt.plot(epochs, history["train_acc"], label="Train Acc")
+    plt.plot(epochs, history["val_acc"], label="Val Acc")
+    plt.xlabel("Epochs")
+    plt.ylabel("Accuracy (%)")
+    plt.title("Accuracy over Epochs")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig("training_history.png")
+    
     # Print final results
     heading("Training Complete")
     print(f"Final Train Accuracy: {history['train_acc'][-1]:.2f}%")
     print(f"Final Validation Accuracy: {history['val_acc'][-1]:.2f}%")
     print(f"Best Validation Accuracy: {max(history['val_acc']):.2f}%")
-
-
-    # # Create dummy data for demonstration
-    # heading("Creating Dummy DataLoaders")
-    # num_train_samples = 200
-    # num_val_samples = 50
-    # num_classes = model_cfg.get("NUM_CLASSES", 9)
-
-    # train_x = torch.randn(num_train_samples, input_channels, embedding_dim)
-    # train_y = torch.randint(0, num_classes, (num_train_samples,))
-    # val_x = torch.randn(num_val_samples, input_channels, embedding_dim)
-    # val_y = torch.randint(0, num_classes, (num_val_samples,))
-
-    # train_dataset = TensorDataset(train_x, train_y)
-    # val_dataset = TensorDataset(val_x, val_y)
-
-    # train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    # val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-
-    # print(f"Train samples: {num_train_samples}, Val samples: {num_val_samples}")
-    # print(f"Batch size: {batch_size}")
-    # print(f"Train batches: {len(train_loader)}, Val batches: {len(val_loader)}")
-
-
 
 if __name__ == "__main__":
     main()

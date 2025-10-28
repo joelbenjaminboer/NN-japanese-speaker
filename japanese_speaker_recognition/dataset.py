@@ -40,7 +40,7 @@ class JapaneseVowelsDataset:
         self,
         cfg: dict[str, Any],
         augmenter: AugmentationPipeline | None = None,
-        embedding_dim: int = 64,
+        embedding_dim: int = 512,
         embedding_model: str = "nomic-embed-text-v1.5",
         embedidng_precision: int = 2,
         key: str | None = None,
