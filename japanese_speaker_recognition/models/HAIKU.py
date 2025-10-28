@@ -175,60 +175,74 @@ class HAIKU(nn.Module):
 
     def train_model(
         self,
-        x_train: Tensor,
-        y_train: Tensor,
-        x_val: Tensor,
-        y_val: Tensor,
+        x_train: ndarray,
+        y_train: ndarray,
         learning_rate: float = 0.007,
         num_epochs: int = 10,
-        batch_size: int = 32
-    ) -> dict[str, Any]:
-        """Train the model and return training history."""
+        batch_size: int = 32,
+        k_folds: int = 5
+    ) -> dict:
+        """Train the model and return training history with cross-validation."""
 
-        train_dataset = TensorDataset(x_train, y_train)
-        val_dataset = TensorDataset(x_val, y_val)
-
-        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-        val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-
-        optimizer = torch.optim.RAdam(self.parameters(), lr=learning_rate)
-        criterion = nn.CrossEntropyLoss()
-
+        kf = KFold(n_splits=k_folds, shuffle=True, random_state=42)
         history = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
 
         self.to(self.device)
 
-        heading(f"Training for {num_epochs} epochs (lr={learning_rate}, device={self.device})")
+        heading(f"Training for {num_epochs} epochs with {k_folds}-fold cross-validation (lr={learning_rate}, device={self.device})")
 
-        for epoch in tqdm(range(num_epochs), desc="Epochs", unit="epoch"):
-            # Training
-            train_loss, train_acc = self._train_step(train_loader, optimizer, criterion)
+        # Cross-validation loop
+        for fold, (train_idx, val_idx) in enumerate(kf.split(x_train)):
+            print(f"\nStarting fold {fold + 1}/{k_folds}...")
 
-            # Validation
-            val_loss, val_acc = self.evaluate(val_loader, criterion)
-            history["val_loss"].append(val_loss)
-            history["val_acc"].append(val_acc)
-            # Validation
-            # if epoch % 10 == 0 or epoch == num_epochs - 1:
-            #     val_loss, val_acc = self.evaluate(val_loader, criterion)
-            #     history["val_loss"].append(val_loss)
-            #     history["val_acc"].append(val_acc)
-            # else:
-            #     val_loss, val_acc = 0.0, 0.0
-            #     history["val_loss"].append(val_loss)
-            #     history["val_acc"].append(val_acc)
+            # Split data into train and validation sets for this fold
+            X_train_fold, X_val_fold = x_train[train_idx], x_train[val_idx]
+            y_train_fold, y_val_fold = y_train[train_idx], y_train[val_idx]
 
-            # Store history
-            history["train_loss"].append(train_loss)
-            history["train_acc"].append(train_acc)
+            # Create DataLoaders for this fold
+            train_dataset = TensorDataset(X_train_fold, y_train_fold)
+            val_dataset = TensorDataset(X_val_fold, y_val_fold)
+
+            train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+            val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+
+            optimizer = torch.optim.RAdam(self.parameters(), lr=learning_rate)
+            criterion = nn.CrossEntropyLoss()
+
+            fold_history = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
+
+            for epoch in range(num_epochs):
+                # Training
+                train_loss, train_acc = self._train_step(train_loader, optimizer, criterion)
+
+                # Validation
+                val_loss, val_acc = self.evaluate(val_loader, criterion)
+
+                # Store history for this fold
+                fold_history["train_loss"].append(train_loss)
+                fold_history["train_acc"].append(train_acc)
+                fold_history["val_loss"].append(val_loss)
+                fold_history["val_acc"].append(val_acc)
 
             tqdm.write(
                 f"Epoch [{epoch + 1}/{num_epochs}] "
                 f"Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.2f}% | "
                 f"Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.2f}%"
             )
+                print(
+                    f"Epoch [{epoch + 1}/{num_epochs}] "
+                    f"Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.2f}% | "
+                    f"Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.2f}%"
+                )
+
+            # Store fold results into the overall history
+            history["train_loss"].append(fold_history["train_loss"])
+            history["train_acc"].append(fold_history["train_acc"])
+            history["val_loss"].append(fold_history["val_loss"])
+            history["val_acc"].append(fold_history["val_acc"])
 
         return history
+
 
     def _train_step(
         self,

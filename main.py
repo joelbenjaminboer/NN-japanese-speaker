@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import yaml
-
+from torch.utils.data import TensorDataset
 from japanese_speaker_recognition.data_augmentation import AugmentationPipeline
 from japanese_speaker_recognition.dataset import JapaneseVowelsDataset
 from japanese_speaker_recognition.models.HAIKU import HAIKU
@@ -62,13 +62,15 @@ def main():
     artifacts = ds.prepare()
     x_train = artifacts["X_train"]
     y_train = artifacts["y_train"]
-    x_val = artifacts["X_test"]
-    y_val = artifacts["y_test"]
+    x_test = artifacts["X_test"]
+    y_test = artifacts["y_test"]
+    
+    
 
     x_train = torch.tensor(x_train, dtype=torch.float32)  # Shape: [B, 12, 64]
     y_train = torch.tensor(y_train, dtype=torch.long)     # Shape: [B, ]    
-    x_val = torch.tensor(x_val, dtype=torch.float32)
-    y_val = torch.tensor(y_val, dtype=torch.long)
+    x_test = torch.tensor(x_test, dtype=torch.float32)
+    y_test = torch.tensor(y_test, dtype=torch.long)
     
     # quick summary (shapes + file outputs)
     heading("Artifacts")
@@ -125,13 +127,12 @@ def main():
 
     # Train the model
     history = model.train_model(
-        x_train=x_train,
-        y_train=y_train,
-        x_val=x_val,
-        y_val=y_val,
-        learning_rate=model_cfg.get("LEARNING_RATE", 0.007),
-        num_epochs=model_cfg.get("NUM_EPOCHS", 10),
-        batch_size=model_cfg.get("BATCH_SIZE", 32)
+        x_train,
+        y_train,
+        learning_rate = model_cfg.get("LEARNING_RATE", 0.001),
+        num_epochs = model_cfg.get("NUM_EPOCHS", 500),
+        batch_size = batch_size,
+        k_folds = model_cfg.get("K_FOLDS", 10),
     )
     
     # plot the training history
@@ -157,9 +158,14 @@ def main():
     
     # Print final results
     heading("Training Complete")
-    print(f"Final Train Accuracy: {history['train_acc'][-1]:.2f}%")
-    print(f"Final Validation Accuracy: {history['val_acc'][-1]:.2f}%")
-    print(f"Best Validation Accuracy: {max(history['val_acc']):.2f}%")
-
+    print(f"Final Train Accuracy: {history['train_acc'][-1][-1]:.2f}%")
+    print(f"Final Validation Accuracy: {history['val_acc'][-1][-1]:.2f}%")
+    
+    # evaluate on test set
+    test_set = TensorDataset(x_test, y_test)
+    test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False)
+    avg_loss, test_acc = model.evaluate(test_loader, criterion=nn.CrossEntropyLoss())
+    print(f"Test Set Accuracy: {test_acc:.2f}%")
+    print(f"Test Set Loss: {avg_loss:.4f}")
 if __name__ == "__main__":
     main()
