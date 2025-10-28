@@ -1,5 +1,6 @@
 DATA_URL: "https://archive.ics.uci.edu/ml/machine-learning-databases/JapaneseVowels/"
 
+SEED: 42
 
 PIPELINE: # Change these for the pipeline
   TRAIN: True
@@ -50,3 +51,18 @@ MODEL:
   BATCH_SIZE: 32
   NUM_EPOCHS: 50
   DEVICE: "cuda"  # Options: "cuda", "cpu", "auto" (auto-detect)
+
+OPTUNA:
+  ENABLED: true
+  N_TRIALS: 50
+  STUDY_NAME: "HAIKU_speaker_recognition"
+  FIGURES_DIR: "reports/optuna/figures"
+  STUDY_DIR: "reports/optuna/study"
+  BEST_CONFIG_DIR: "reports/optuna/best_config"
+  RANGES:
+    LEARNING_RATE: [1e-5, 1e-2]
+    DROPOUT: [0.1, 0.5]
+    CONV_CHANNELS: [64, 128, 256]
+    HIDDEN_DIM: [32, 64, 128]
+    KERNEL_SIZE: [3, 5, 7]
+    BATCH_SIZE: [16, 32, 64]

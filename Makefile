@@ -4,7 +4,7 @@
 
 PROJECT_NAME = NN-japanese-speaker
 PYTHON_VERSION = 3.11
-SRC := main.py japanese_speaker_recognition tests
+SRC := main.py japanese_speaker_recognition/ tests/ utils/
 
 # Ruff options
 RUFF_CHECK_OPTS := --respect-gitignore
@@ -48,7 +48,7 @@ lint:
 .PHONY: format
 format:
 	uv run ruff check --fix $(RUFF_CHECK_OPTS) $(SRC)
-	uv run ruff format $(RUFF_FORMAT_OPTS) $(SRC)
+# 	uv run ruff format $(RUFF_FORMAT_OPTS) $(SRC)
 
 ## Static type checking
 .PHONY: typecheck

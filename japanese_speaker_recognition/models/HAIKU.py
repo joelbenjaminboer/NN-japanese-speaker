@@ -1,9 +1,8 @@
-from typing import Self
-
-from numpy import ndarray
+from typing import Any, Self
 
 import torch
 import torch.nn as nn
+from torch import Tensor
 from torch.nn.modules.container import Sequential
 from torch.nn.modules.pooling import AdaptiveAvgPool1d
 from torch.utils.data import DataLoader, TensorDataset
@@ -101,7 +100,7 @@ class HAIKU(nn.Module):
         return x.squeeze(-1)  # [B, 128]
 
     @classmethod
-    def _from_config(cls, config: dict[str, int | float]) -> Self:
+    def _from_config(cls, config: dict[str, int | float | str]) -> Self:
         """
         Create SpeakerCNN from configuration dictionary.
         Args:
@@ -153,9 +152,9 @@ class HAIKU(nn.Module):
 
     @classmethod
     def create_model(cls, model_cfg: dict) -> Self:
-        """Create CNN model from configuration."""
+        """Create HAIKU model from configuration."""
         model = cls._from_config(model_cfg)
-        
+
         total_params = sum(p.numel() for p in model.parameters())
         trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
@@ -175,14 +174,14 @@ class HAIKU(nn.Module):
 
     def train_model(
         self,
-        x_train: ndarray,
-        y_train: ndarray,
-        x_val: ndarray,
-        y_val: ndarray,
+        x_train: Tensor,
+        y_train: Tensor,
+        x_val: Tensor,
+        y_val: Tensor,
         learning_rate: float = 0.007,
         num_epochs: int = 10,
         batch_size: int = 32
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Train the model and return training history."""
 
         train_dataset = TensorDataset(x_train, y_train)
