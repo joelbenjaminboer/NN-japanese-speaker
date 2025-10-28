@@ -48,5 +48,6 @@ MODEL:
   INPUT_CHANNELS: 12
   LEARNING_RATE: 0.007
   BATCH_SIZE: 32
-  NUM_EPOCHS: 50
+  NUM_EPOCHS: 500
+  KFOLDS: 10
   DEVICE: "cuda"  # Options: "cuda", "cpu", "auto" (auto-detect)
