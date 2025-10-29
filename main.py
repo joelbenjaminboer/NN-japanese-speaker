@@ -96,11 +96,6 @@ def main():
     
     # quick summary (shapes + file outputs)
     heading("Artifacts")
-    for k, v in artifacts.items():
-        if hasattr(v, "shape"):
-            print(f"{k:15s} -> shape={v.shape}")
-        else:
-            print(f"{k:15s} -> {v}")
 
     figures_dir = Path(
         cfg.get("OPTUNA", {}).get("FIGURES_DIR", "reports/optuna/figures")
@@ -159,10 +154,10 @@ def main():
         x_train,
         y_train,
         learning_rate = model_cfg.get("LEARNING_RATE", 0.001),
-        num_epochs = model_cfg.get("NUM_EPOCHS", 500),
+        num_epochs = model_cfg.get("NUM_EPOCHS", 500),  
         batch_size = batch_size,
-        val_split = model_cfg.get("VAL_SPLIT", 0.1),
-        seed = cfg.get("SEED", 42)
+        k_folds= model_cfg.get("K_FOLDS", 5),
+        seed= cfg.get("SEED", 42)
     )
     
     figure_dir = Path("reports/figures")

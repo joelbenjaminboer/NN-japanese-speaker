@@ -4,6 +4,7 @@ from typing import Any, Literal
 import optuna
 from optuna import Study, Trial
 from torch import Tensor
+import numpy as np
 
 from japanese_speaker_recognition.models.HAIKU import HAIKU
 from utils.utils import heading
@@ -115,11 +116,11 @@ class OptunaTuner:
             learning_rate=suggested_params["LEARNING_RATE"],
             num_epochs=num_epochs,
             batch_size=suggested_params["BATCH_SIZE"],
-            val_split=self.base_config.get("MODEL", {}).get("VAL_SPLIT", 0.1),
+            k_folds=self.base_config.get("MODEL", {}).get("K_FOLDS", 5),
             seed=self.seed,
         )
 
-        best_val_acc = max(history["val_acc"])
+        best_val_acc = np.mean(history["val_acc"])
         print(f"Best validation accuracy: {best_val_acc:.4f}")
         return best_val_acc
 
@@ -160,7 +161,7 @@ class OptunaTuner:
     def get_best_config(self) -> dict[str, int | float | str]:
         if self.study is None:
             raise ValueError("Must run optimize() first.")
-
+        
         best_params = self.study.best_params
         model_section = self.base_config.get("MODEL", {})
         return {

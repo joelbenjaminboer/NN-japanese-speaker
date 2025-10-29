@@ -10,6 +10,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 from typing_extensions import override
 from torch.utils.data import random_split
+from torch.utils.data import Subset
 
 from utils.utils import heading
 
@@ -152,6 +153,13 @@ class HAIKU(nn.Module):
             print("Using CPU")
 
         return device
+    
+    def _init_weights(self, m):
+        if isinstance(m, (nn.Linear, nn.Conv1d, nn.Conv2d)):
+            nn.init.xavier_uniform_(m.weight)
+            if m.bias is not None:
+                nn.init.zeros_(m.bias)
+
 
     @classmethod
     def create_model(cls, model_cfg: dict[str, int | float | str]) -> Self:
@@ -182,55 +190,78 @@ class HAIKU(nn.Module):
         learning_rate: float = 0.007,
         num_epochs: int = 10,
         batch_size: int = 32,
-        val_split: float = 0.1,
+        k_folds: int = 5,
         seed: int = 42
     ) -> dict:
-        """Train the model and return training history with a single 90/10 validation split."""
+        """Train the model using K-Fold cross-validation and return averaged training history."""
 
         torch.manual_seed(seed)
         self.to(self.device)
 
-        heading(f"Training for {num_epochs} epochs with {int(val_split*100)}% validation split \
-            (lr={learning_rate}, device={self.device})")
+        heading(f"Training for {num_epochs} epochs with {k_folds}-Fold cross-validation "
+                f"(lr={learning_rate}, device={self.device})")
 
-        # Create full dataset and split into train/validation
         full_dataset = TensorDataset(x_train, y_train)
-        val_size = int(len(full_dataset) * val_split)
-        train_size = len(full_dataset) - val_size
-        train_dataset, val_dataset = random_split(full_dataset, [train_size, val_size])
+        kf = KFold(n_splits=k_folds, shuffle=True, random_state=seed)
 
-        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-        val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-
-        optimizer = torch.optim.RAdam(self.parameters(), lr=learning_rate)
-        criterion = nn.CrossEntropyLoss()
-
+        # Store averaged metrics across folds
         history = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
 
-        # Epoch progress bar
-        epoch_bar = tqdm(range(num_epochs), desc="Training", leave=True)
+        # Loop through folds
+        for fold, (train_idx, val_idx) in enumerate(kf.split(x_train)):
+            print(f"\n{'='*20} Fold {fold + 1}/{k_folds} {'='*20}")
+            global_history = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
+            # Split dataset
+            train_subset = Subset(full_dataset, train_idx)
+            val_subset = Subset(full_dataset, val_idx)
 
-        for epoch in epoch_bar:
-            # Training step
-            train_loss, train_acc = self._train_step(train_loader, optimizer, criterion)
+            train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
+            val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
 
-            # Validation step
-            val_loss, val_acc = self.evaluate(val_loader, criterion)
+            # Reinitialize model weights before each fold
+            self.apply(self._init_weights)
 
-            # Store metrics
-            history["train_loss"].append(train_loss)
-            history["train_acc"].append(train_acc)
-            history["val_loss"].append(val_loss)
-            history["val_acc"].append(val_acc)
+            optimizer = torch.optim.RAdam(self.parameters(), lr=learning_rate)
+            criterion = nn.CrossEntropyLoss()
 
-            epoch_bar.set_postfix(
-                train_loss=f'{train_loss:.4f}',
-                train_acc=f'{train_acc:.2f}%',
-                val_loss=f'{val_loss:.4f}',
-                val_acc=f'{val_acc:.2f}%'
-            )
+            # Track metrics for this fold
+            fold_hist = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
 
-        return history
+            epoch_bar = tqdm(range(num_epochs), desc=f"Fold {fold + 1}", leave=False)
+
+            for epoch in epoch_bar:
+                train_loss, train_acc = self._train_step(train_loader, optimizer, criterion)
+                val_loss, val_acc = self.evaluate(val_loader, criterion)
+
+                fold_hist["train_loss"].append(train_loss)
+                fold_hist["train_acc"].append(train_acc)
+                fold_hist["val_loss"].append(val_loss)
+                fold_hist["val_acc"].append(val_acc)
+                global_history["train_loss"].append(train_loss)
+                global_history["train_acc"].append(train_acc)
+                global_history["val_loss"].append(val_loss)
+                global_history["val_acc"].append(val_acc)
+
+                epoch_bar.set_postfix(
+                    train_loss=f'{train_loss:.4f}',
+                    train_acc=f'{train_acc:.2f}%',
+                    val_loss=f'{val_loss:.4f}',
+                    val_acc=f'{val_acc:.2f}%'
+                )
+
+            # Average metrics over epochs for this fold
+            for key in history:
+                history[key].append(sum(fold_hist[key]) / len(fold_hist[key]))
+
+        # Average results over folds
+        averaged_history = {k: sum(v) / len(v) for k, v in history.items()}
+
+        print("\n===== Cross-validation results =====")
+        print(f"Avg Train Acc: {averaged_history['train_acc']:.2f}%")
+        print(f"Avg Val Acc:   {averaged_history['val_acc']:.2f}%")
+
+        return global_history
+
 
 
     def _train_step(
