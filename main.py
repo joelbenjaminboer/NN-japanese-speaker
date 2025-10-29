@@ -161,7 +161,8 @@ def main():
         learning_rate = model_cfg.get("LEARNING_RATE", 0.001),
         num_epochs = model_cfg.get("NUM_EPOCHS", 500),
         batch_size = batch_size,
-        k_folds = model_cfg.get("K_FOLDS", 10),
+        val_split = model_cfg.get("VAL_SPLIT", 0.1),
+        seed = cfg.get("SEED", 42)
     )
     
     figure_dir = Path("reports/figures")
@@ -170,8 +171,8 @@ def main():
 
     # Print final results
     heading("Training Complete")
-    print(f"Final Train Accuracy: {history['train_acc'][-1][-1]:.2f}%")
-    print(f"Final Validation Accuracy: {history['val_acc'][-1][-1]:.2f}%")
+    print(f"Final Train Accuracy: {history['train_acc'][-1]:.2f}%")
+    print(f"Final Validation Accuracy: {history['val_acc'][-1]:.2f}%")
     
     # evaluate on test set
     test_set = TensorDataset(x_test, y_test)

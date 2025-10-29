@@ -50,8 +50,8 @@ MODEL:
   HIDDEN_DIM: 64
   LEARNING_RATE: 0.007
   BATCH_SIZE: 32
-  NUM_EPOCHS: 50
-  K_FOLDS: 5
+  NUM_EPOCHS: 500
+  VAL_SPLIT: 0.1
   DEVICE: "auto"  # Options: "cuda", "cpu", "auto"
 
 OPTUNA:

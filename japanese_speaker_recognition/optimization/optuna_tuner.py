@@ -114,12 +114,12 @@ class OptunaTuner:
             y_train=self.y_train,
             learning_rate=suggested_params["LEARNING_RATE"],
             num_epochs=num_epochs,
-            batch_size=int(suggested_params["BATCH_SIZE"]),
-            k_folds=int(self.base_config.get("MODEL", {}).get("K_FOLDS", 10)),
-            seed=self.seed
+            batch_size=suggested_params["BATCH_SIZE"],
+            val_split=self.base_config.get("MODEL", {}).get("VAL_SPLIT", 0.1),
+            seed=self.seed,
         )
 
-        best_val_acc = max(history["val_acc"][-1])
+        best_val_acc = max(history["val_acc"])
         print(f"Best validation accuracy: {best_val_acc:.4f}")
         return best_val_acc
 

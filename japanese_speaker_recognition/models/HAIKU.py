@@ -9,6 +9,7 @@ from torch.nn.modules.pooling import AdaptiveAvgPool1d
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 from typing_extensions import override
+from torch.utils.data import random_split
 
 from utils.utils import heading
 
@@ -176,72 +177,58 @@ class HAIKU(nn.Module):
 
     def train_model(
         self,
-        x_train: Tensor,
-        y_train: Tensor,
+        x_train: torch.Tensor,
+        y_train: torch.Tensor,
         learning_rate: float = 0.007,
         num_epochs: int = 10,
         batch_size: int = 32,
-        k_folds: int = 5,
+        val_split: float = 0.1,
         seed: int = 42
     ) -> dict:
-        """Train the model and return training history with cross-validation."""
+        """Train the model and return training history with a single 90/10 validation split."""
 
-        kf = KFold(n_splits=k_folds, shuffle=True, random_state=seed)
-        history = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
-
+        torch.manual_seed(seed)
         self.to(self.device)
 
-        heading(f"Training for {num_epochs} epochs with {k_folds}-fold cross-validation \
+        heading(f"Training for {num_epochs} epochs with {int(val_split*100)}% validation split \
             (lr={learning_rate}, device={self.device})")
-    
-        # Cross-validation loop
-        for fold, (train_idx, val_idx) in enumerate(kf.split(x_train)):
-            print(f"\nStarting fold {fold + 1}/{k_folds}...")
 
-            # Split data into train and validation sets for this fold
-            X_train_fold, X_val_fold = x_train[train_idx], x_train[val_idx]
-            y_train_fold, y_val_fold = y_train[train_idx], y_train[val_idx]
+        # Create full dataset and split into train/validation
+        full_dataset = TensorDataset(x_train, y_train)
+        val_size = int(len(full_dataset) * val_split)
+        train_size = len(full_dataset) - val_size
+        train_dataset, val_dataset = random_split(full_dataset, [train_size, val_size])
 
-            # Create DataLoaders for this fold
-            train_dataset = TensorDataset(X_train_fold, y_train_fold)
-            val_dataset = TensorDataset(X_val_fold, y_val_fold)
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+        val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
-            train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-            val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+        optimizer = torch.optim.RAdam(self.parameters(), lr=learning_rate)
+        criterion = nn.CrossEntropyLoss()
 
-            optimizer = torch.optim.RAdam(self.parameters(), lr=learning_rate)
-            criterion = nn.CrossEntropyLoss()
+        history = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
 
-            fold_history = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
+        # Epoch progress bar
+        epoch_bar = tqdm(range(num_epochs), desc="Training", leave=True)
 
-            # Add tqdm progress bar for epochs
-            epoch_bar = tqdm(range(num_epochs), desc=f"Fold {fold + 1}/{k_folds}", leave=True)
+        for epoch in epoch_bar:
+            # Training step
+            train_loss, train_acc = self._train_step(train_loader, optimizer, criterion)
 
-            for epoch in epoch_bar:
-                # Training
-                train_loss, train_acc = self._train_step(train_loader, optimizer, criterion)
+            # Validation step
+            val_loss, val_acc = self.evaluate(val_loader, criterion)
 
-                # Validation
-                val_loss, val_acc = self.evaluate(val_loader, criterion)
+            # Store metrics
+            history["train_loss"].append(train_loss)
+            history["train_acc"].append(train_acc)
+            history["val_loss"].append(val_loss)
+            history["val_acc"].append(val_acc)
 
-                # Store history for this fold
-                fold_history["train_loss"].append(train_loss)
-                fold_history["train_acc"].append(train_acc)
-                fold_history["val_loss"].append(val_loss)
-                fold_history["val_acc"].append(val_acc)
-
-                epoch_bar.set_postfix(
-                    train_loss=f'{train_loss:.4f}',
-                    train_acc=f'{train_acc:.2f}%',
-                    val_loss=f'{val_loss:.4f}',
-                    val_acc=f'{val_acc:.2f}%'
-                )
-
-            # Store fold results into the overall history
-            history["train_loss"].append(fold_history["train_loss"])
-            history["train_acc"].append(fold_history["train_acc"])
-            history["val_loss"].append(fold_history["val_loss"])
-            history["val_acc"].append(fold_history["val_acc"])
+            epoch_bar.set_postfix(
+                train_loss=f'{train_loss:.4f}',
+                train_acc=f'{train_acc:.2f}%',
+                val_loss=f'{val_loss:.4f}',
+                val_acc=f'{val_acc:.2f}%'
+            )
 
         return history
 
