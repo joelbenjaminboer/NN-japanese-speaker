@@ -45,7 +45,7 @@ def print_model_summary(model: nn.Module, input_shape: tuple):
         logits = model.classifier(x)
         print(f"After Classifier (MLP): {logits.shape}")
 
-def plot_training_history(history: dict) -> None:
+def plot_training_history(history: dict, figure_dir: Path) -> None:
     """Plot training history."""
     heading("Training History")
     epochs = range(1, len(history["train_loss"]) + 1)
@@ -65,7 +65,7 @@ def plot_training_history(history: dict) -> None:
     plt.title("Accuracy over Epochs")
     plt.legend()
     plt.tight_layout()
-    plt.savefig("training_history.png")
+    plt.savefig(figure_dir / "training_history.png")
 
 def main():
     # Load the config and print current settings
@@ -102,6 +102,19 @@ def main():
         else:
             print(f"{k:15s} -> {v}")
 
+    figures_dir = Path(
+        cfg.get("OPTUNA", {}).get("FIGURES_DIR", "reports/optuna/figures")
+        )
+    study_dir = Path(
+        cfg.get("OPTUNA", {}).get("STUDY_DIR", "reports/optuna/study")
+        )
+    best_config_dir = Path(
+        cfg.get("OPTUNA", {}).get("BEST_CONFIG_DIR", "reports/optuna/best_config")
+        )
+    figures_dir.mkdir(parents=True, exist_ok=True)
+    best_config_dir.mkdir(parents=True, exist_ok=True)
+    study_dir.mkdir(parents=True, exist_ok=True)
+
     if cfg.get("OPTUNA", {}).get("ENABLED", False):
         tuner = OptunaTuner(
             x_train=x_train,
@@ -114,31 +127,28 @@ def main():
 
         _ = tuner.optimize()
 
-        figures_dir = Path(
-            cfg.get("OPTUNA", {}).get("FIGURES_DIR", "reports/optuna/figures")
-            )
-        study_dir = Path(
-            cfg.get("OPTUNA", {}).get("STUDY_DIR", "reports/optuna/study")
-            )
-        best_config_dir = Path(
-            cfg.get("OPTUNA", {}).get("BEST_CONFIG_DIR", "reports/optuna/best_config")
-            )
-
         figures_dir.mkdir(parents=True, exist_ok=True)
         study_dir.mkdir(parents=True, exist_ok=True)
         best_config_dir.mkdir(parents=True, exist_ok=True)
 
         tuner.save_plots(output_dir=figures_dir)
-        tuner.save_study(output_dir=study_dir)
+        tuner.save_study(output_dir=study_dir / "optuna_study.pkl")
 
         model_cfg = tuner.get_best_config()
         # save the config
         with open(best_config_dir / "best_model_config.yaml", "w") as f:
             yaml.dump(model_cfg, f)
 
-    # Get model config and create model
     heading("Model Creation")
-    model_cfg = cfg.get("MODEL", {})
+
+    if cfg.get("MODEL", {}).get("LOAD_BEST_CONFIG", False):
+        with open(best_config_dir / "best_model_config.yaml", "r") as f:
+            model_cfg = yaml.safe_load(f)
+            print("Loaded best model config:")
+            print(yaml.safe_dump(model_cfg, sort_keys=True, default_flow_style=False))
+    else:
+        model_cfg = cfg.get("MODEL", {})
+    
     model = HAIKU.create_model(model_cfg)
     
     # Print detailed model summary
@@ -154,9 +164,10 @@ def main():
         k_folds = model_cfg.get("K_FOLDS", 10),
     )
     
+    figure_dir = Path("reports/figures")
     # plot the training history
-    plot_training_history(history)
-    
+    plot_training_history(history, figure_dir)
+
     # Print final results
     heading("Training Complete")
     print(f"Final Train Accuracy: {history['train_acc'][-1][-1]:.2f}%")

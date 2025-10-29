@@ -2,6 +2,8 @@
 /data**
 !data/.gitkeep
 !data/**/.gitkeep
+reports/optuna/
+!reports/optuna/**/.gitkeep
 
 # Mac OS-specific storage files
 .DS_Store
@@ -197,3 +199,4 @@ cython_debug/
 
 # Basedpyright tings
 typings/
+

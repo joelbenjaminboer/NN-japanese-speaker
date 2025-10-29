@@ -153,7 +153,7 @@ class HAIKU(nn.Module):
         return device
 
     @classmethod
-    def create_model(cls, model_cfg: dict) -> Self:
+    def create_model(cls, model_cfg: dict[str, int | float | str]) -> Self:
         """Create HAIKU model from configuration."""
         model = cls._from_config(model_cfg)
 
@@ -181,18 +181,19 @@ class HAIKU(nn.Module):
         learning_rate: float = 0.007,
         num_epochs: int = 10,
         batch_size: int = 32,
-        k_folds: int = 5
+        k_folds: int = 5,
+        seed: int = 42
     ) -> dict:
         """Train the model and return training history with cross-validation."""
 
-        kf = KFold(n_splits=k_folds, shuffle=True, random_state=42)
+        kf = KFold(n_splits=k_folds, shuffle=True, random_state=seed)
         history = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
 
         self.to(self.device)
 
         heading(f"Training for {num_epochs} epochs with {k_folds}-fold cross-validation \
             (lr={learning_rate}, device={self.device})")
-
+    
         # Cross-validation loop
         for fold, (train_idx, val_idx) in enumerate(kf.split(x_train)):
             print(f"\nStarting fold {fold + 1}/{k_folds}...")
@@ -213,7 +214,10 @@ class HAIKU(nn.Module):
 
             fold_history = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
 
-            for epoch in range(num_epochs):
+            # Add tqdm progress bar for epochs
+            epoch_bar = tqdm(range(num_epochs), desc=f"Fold {fold + 1}/{k_folds}", leave=True)
+
+            for epoch in epoch_bar:
                 # Training
                 train_loss, train_acc = self._train_step(train_loader, optimizer, criterion)
 
@@ -226,10 +230,11 @@ class HAIKU(nn.Module):
                 fold_history["val_loss"].append(val_loss)
                 fold_history["val_acc"].append(val_acc)
 
-                tqdm.write(
-                    f"Epoch [{epoch + 1}/{num_epochs}] "
-                    f"Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.2f}% | "
-                    f"Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.2f}%"
+                epoch_bar.set_postfix(
+                    train_loss=f'{train_loss:.4f}',
+                    train_acc=f'{train_acc:.2f}%',
+                    val_loss=f'{val_loss:.4f}',
+                    val_acc=f'{val_acc:.2f}%'
                 )
 
             # Store fold results into the overall history

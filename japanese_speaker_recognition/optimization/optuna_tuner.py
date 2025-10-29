@@ -115,6 +115,8 @@ class OptunaTuner:
             learning_rate=suggested_params["LEARNING_RATE"],
             num_epochs=num_epochs,
             batch_size=int(suggested_params["BATCH_SIZE"]),
+            k_folds=int(self.base_config.get("MODEL", {}).get("K_FOLDS", 10)),
+            seed=self.seed
         )
 
         best_val_acc = max(history["val_acc"][-1])
@@ -149,7 +151,7 @@ class OptunaTuner:
         self.study.optimize(
             self.objective,
             n_trials=self.n_trials,
-            show_progress_bar=show_progress_bar,
+            # show_progress_bar=show_progress_bar,
         )
 
         self._print_results()
@@ -183,28 +185,42 @@ class OptunaTuner:
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        
         try:
+            import matplotlib.pyplot as plt
+            import numpy as np
+            from optuna.visualization.matplotlib import (
+                plot_optimization_history,
+                plot_param_importances,
+                plot_parallel_coordinate,
+            )
+
             # Optimization history
-            fig = optuna.visualization.plot_optimization_history(self.study)
-            fig.write_image(output_dir / "optuna_optimization_history.png")
+            fig = plot_optimization_history(self.study)
+            plt.tight_layout()
+            plt.savefig(output_dir / "optuna_optimization_history.png", dpi=300, bbox_inches='tight')
+            plt.close()
 
             # Parameter importances
-            fig = optuna.visualization.plot_param_importances(self.study)
-            fig.write_image(output_dir / "optuna_param_importances.png")
+            fig = plot_param_importances(self.study)
+            plt.tight_layout()
+            plt.savefig(output_dir / "optuna_param_importances.png", dpi=300, bbox_inches='tight')
+            plt.close()
 
             # Parallel coordinate plot
-            fig = optuna.visualization.plot_parallel_coordinate(self.study)
-            fig.write_image(output_dir   / "optuna_parallel_coordinate.png")
+            fig = plot_parallel_coordinate(self.study)
+            plt.tight_layout()
+            plt.savefig(output_dir / "optuna_parallel_coordinate.png", dpi=300, bbox_inches='tight')
+            plt.close()
 
             print(f"\nOptuna plots saved to {output_dir}:")
             print("  - optuna_optimization_history.png")
             print("  - optuna_param_importances.png")
             print("  - optuna_parallel_coordinate.png")
 
-        except ImportError:
-            print("\nNote: Install plotly and kaleido to generate plots:")
-            print("  pip install plotly kaleido")
+        except ImportError as e:
+            print(f"\nError generating plots: {e}")
+            print("Make sure matplotlib is installed:")
+            print("  pip install matplotlib")
 
     def save_study(self, output_dir: str | Path = "optuna_study.pkl") -> None:
         if self.study is None:

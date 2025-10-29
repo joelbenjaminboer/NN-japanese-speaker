@@ -40,21 +40,23 @@ OUTPUT_DIRS:
 
 #HAIKU
 MODEL:
+  LOAD_BEST_CONFIG: false # Whether to load the best config from Optuna. Only works if OPTUNA.ENABLED is true
   NUM_CLASSES: 9
-  DROPOUT: 0.3
   EMBEDDING_DIM: 64
   KERNEL_SIZE: 3
   CONV_CHANNELS: 128
-  HIDDEN_DIM: 64
+  DROPOUT: 0.3
   INPUT_CHANNELS: 12
+  HIDDEN_DIM: 64
   LEARNING_RATE: 0.007
   BATCH_SIZE: 32
   NUM_EPOCHS: 50
-  DEVICE: "cuda"  # Options: "cuda", "cpu", "auto" (auto-detect)
+  K_FOLDS: 5
+  DEVICE: "auto"  # Options: "cuda", "cpu", "auto"
 
 OPTUNA:
   ENABLED: true
-  N_TRIALS: 50
+  N_TRIALS: 2
   STUDY_NAME: "HAIKU_speaker_recognition"
   FIGURES_DIR: "reports/optuna/figures"
   STUDY_DIR: "reports/optuna/study"
