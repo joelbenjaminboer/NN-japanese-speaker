@@ -68,17 +68,22 @@ def plot_training_history(history: dict, figure_dir: Path) -> None:
     plt.savefig(figure_dir / "training_history.png")
 
 def main():
-    # Load the config and print current settings
+    # -------------------------------------------
+    # Load the config
+    # -------------------------------------------
     cfg = load_config()
     heading("Config settings")
     print(yaml.safe_dump(cfg, sort_keys=True, default_flow_style=False))
 
-    # Build augmenter from YAML
-    # heading("Augmentation") # Nothing prints here
-    aug_cfg = cfg.get("AUGMENTATION") or {}
+    # -------------------------------------------
+    # Build data augmentation pipeline from YAML
+    # -------------------------------------------
+    aug_cfg = cfg.get("AUGMENTATION", {})
     augmenter = AugmentationPipeline.from_config(aug_cfg) if aug_cfg else None
 
+    # -------------------------------------------
     # Prep the dataset
+    # -------------------------------------------
     heading("Preparing dataset")
     ds = JapaneseVowelsDataset(cfg, augmenter=augmenter)
     artifacts = ds.prepare()
@@ -86,8 +91,6 @@ def main():
     y_train = artifacts["y_train"]
     x_test = artifacts["X_test"]
     y_test = artifacts["y_test"]
-    
-    
 
     x_train = torch.tensor(x_train, dtype=torch.float32)  # Shape: [B, 12, 64]
     y_train = torch.tensor(y_train, dtype=torch.long)     # Shape: [B, ]    
@@ -112,6 +115,10 @@ def main():
     best_config_dir.mkdir(parents=True, exist_ok=True)
     study_dir.mkdir(parents=True, exist_ok=True)
 
+    # -------------------------------------------
+    # Optuna Hyperparameter Tuning
+    # -------------------------------------------
+    # TODO: save the best model as a pkl for easy retrieval.
     if cfg.get("OPTUNA", {}).get("ENABLED", False):
         tuner = OptunaTuner(
             x_train=x_train,
@@ -136,10 +143,13 @@ def main():
         with open(best_config_dir / "best_model_config.yaml", "w") as f:
             yaml.dump(model_cfg, f)
 
+    # -------------------------------------------
+    # Model Creation from config
+    # -------------------------------------------
     heading("Model Creation")
 
     if cfg.get("MODEL", {}).get("LOAD_BEST_CONFIG", False):
-        with open(best_config_dir / "best_model_config.yaml", "r") as f:
+        with open(best_config_dir / "best_model_config.yaml") as f:
             model_cfg = yaml.safe_load(f)
             print("Loaded best model config:")
             print(yaml.safe_dump(model_cfg, sort_keys=True, default_flow_style=False))
@@ -171,7 +181,9 @@ def main():
     print(f"Final Train Accuracy: {history['train_acc'][-1]:.2f}%")
     print(f"Final Validation Accuracy: {history['val_acc'][-1]:.2f}%")
     
-    # evaluate on test set
+    # -------------------------------------------
+    # Model Evaluation
+    # -------------------------------------------
     test_set = TensorDataset(x_test, y_test)
     test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False)
     avg_loss, test_acc = model.evaluate(test_loader, criterion=nn.CrossEntropyLoss())

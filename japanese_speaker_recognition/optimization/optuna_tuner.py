@@ -189,27 +189,30 @@ class OptunaTuner:
 
         try:
             import matplotlib.pyplot as plt
-            import numpy as np
             from optuna.visualization.matplotlib import (
                 plot_optimization_history,
-                plot_param_importances,
                 plot_parallel_coordinate,
+                plot_param_importances,
             )
 
             # Optimization history
-            fig = plot_optimization_history(self.study)
+            _ = plot_optimization_history(self.study)
             plt.tight_layout()
-            plt.savefig(output_dir / "optuna_optimization_history.png", dpi=300, bbox_inches='tight')
+            plt.savefig(
+                output_dir / "optuna_optimization_history.png", 
+                dpi=300, 
+                bbox_inches='tight'
+                )
             plt.close()
 
             # Parameter importances
-            fig = plot_param_importances(self.study)
+            _ = plot_param_importances(self.study)
             plt.tight_layout()
             plt.savefig(output_dir / "optuna_param_importances.png", dpi=300, bbox_inches='tight')
             plt.close()
 
             # Parallel coordinate plot
-            fig = plot_parallel_coordinate(self.study)
+            _ = plot_parallel_coordinate(self.study)
             plt.tight_layout()
             plt.savefig(output_dir / "optuna_parallel_coordinate.png", dpi=300, bbox_inches='tight')
             plt.close()

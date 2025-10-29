@@ -2,11 +2,9 @@ from typing import Self
 
 import torch
 import torch.nn as nn
-from sklearn.model_selection import KFold
-from torch import Tensor
 from torch.nn.modules.container import Sequential
 from torch.nn.modules.pooling import AdaptiveAvgPool1d
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import DataLoader, TensorDataset, random_split
 from tqdm import tqdm
 from typing_extensions import override
 from torch.utils.data import random_split
@@ -229,9 +227,12 @@ class HAIKU(nn.Module):
 
             epoch_bar = tqdm(range(num_epochs), desc=f"Fold {fold + 1}", leave=False)
 
-            for epoch in epoch_bar:
-                train_loss, train_acc = self._train_step(train_loader, optimizer, criterion)
-                val_loss, val_acc = self.evaluate(val_loader, criterion)
+        for _epoch in epoch_bar:
+            # Training step
+            train_loss, train_acc = self._train_step(train_loader, optimizer, criterion)
+
+            # Validation step
+            val_loss, val_acc = self.evaluate(val_loader, criterion)
 
                 fold_hist["train_loss"].append(train_loss)
                 fold_hist["train_acc"].append(train_acc)
