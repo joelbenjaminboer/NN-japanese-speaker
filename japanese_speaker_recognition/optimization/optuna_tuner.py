@@ -99,7 +99,7 @@ class OptunaTuner:
             "HIDDEN_DIM": suggested_params.get("HIDDEN_DIM", 64),
             "INPUT_CHANNELS": model_config.get("INPUT_CHANNELS", 12),
             "NUM_CLASSES": model_config.get("NUM_CLASSES", 9),
-            "DEVICE": suggested_params.get("DEVICE", "cpu"),
+            "DEVICE": model_config.get("DEVICE", "cpu"),
         }
 
     def objective(self, trial: Trial) -> float:
@@ -171,7 +171,7 @@ class OptunaTuner:
             "HIDDEN_DIM": best_params["HIDDEN_DIM"],
             "INPUT_CHANNELS": model_section.get("INPUT_CHANNELS", 12),
             "NUM_CLASSES": model_section.get("NUM_CLASSES", 9),
-            "DEVICE": best_params.get("DEVICE", "cpu"),
+            "DEVICE": model_section.get("DEVICE", "cpu"),
             "LEARNING_RATE": best_params["LEARNING_RATE"],
             "BATCH_SIZE": best_params["BATCH_SIZE"],
             "NUM_EPOCHS": model_section.get("NUM_EPOCHS", 100),

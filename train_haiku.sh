@@ -1,5 +1,6 @@
 #!/bin/bash
 #SBATCH --time=00:20:00
+#SBATCH --output=habrok_outputs/%j.out
 #SBATCH --partition=digitallab
 #SBATCH --gpus-per-node=h100_80gb_hbm3_1g.10gb:1
 #SBATCH --mem=8000
