@@ -15,13 +15,15 @@ from japanese_speaker_recognition.models.HAIKU import HAIKU
 from japanese_speaker_recognition.optimization.optuna_tuner import OptunaTuner
 from utils.utils import heading
 
+from config.config import Config, Model
 
-def load_config(path: str | Path = "config.yaml") -> dict[str, Any]:
-    p = Path(path)
-    if not p.exists():
-        raise FileNotFoundError(f"Config not found: {p.resolve()}")
-    with p.open("r", encoding="utf-8") as f:
-        return yaml.safe_load(f) or {}
+
+# def load_config(path: str | Path = "config.yaml") -> dict[str, Any]:
+#     p = Path(path)
+#     if not p.exists():
+#         raise FileNotFoundError(f"Config not found: {p.resolve()}")
+#     with p.open("r", encoding="utf-8") as f:
+#         return yaml.safe_load(f) or {}
 
 def print_model_summary(model: nn.Module, input_shape: tuple):
     """Print detailed model architecture."""
@@ -71,15 +73,14 @@ def main():
     # -------------------------------------------
     # Load the config
     # -------------------------------------------
-    cfg = load_config()
+    cfg = Config.from_yaml()
     heading("Config settings")
-    print(yaml.safe_dump(cfg, sort_keys=True, default_flow_style=False))
+    print(cfg)
 
     # -------------------------------------------
     # Build data augmentation pipeline from YAML
     # -------------------------------------------
-    aug_cfg = cfg.get("AUGMENTATION", {})
-    augmenter = AugmentationPipeline.from_config(aug_cfg) if aug_cfg else None
+    augmenter = AugmentationPipeline.from_config(cfg)
 
     # -------------------------------------------
     # Prep the dataset
@@ -102,38 +103,29 @@ def main():
     # quick summary (shapes + file outputs)
     heading("Artifacts")
 
-    figures_dir = Path(
-        cfg.get("OPTUNA", {}).get("FIGURES_DIR", "reports/optuna/figures")
-        )
-    study_dir = Path(
-        cfg.get("OPTUNA", {}).get("STUDY_DIR", "reports/optuna/study")
-        )
-    best_config_dir = Path(
-        cfg.get("OPTUNA", {}).get("BEST_CONFIG_DIR", "reports/optuna/best_config")
-        )
+    figures_dir = cfg.optuna.figures_dir
+    study_dir = cfg.optuna.study_dir
+    best_config_dir = cfg.optuna.best_config_dir
+
     figures_dir.mkdir(parents=True, exist_ok=True)
-    best_config_dir.mkdir(parents=True, exist_ok=True)
     study_dir.mkdir(parents=True, exist_ok=True)
+    best_config_dir.mkdir(parents=True, exist_ok=True)
 
     # -------------------------------------------
     # Optuna Hyperparameter Tuning
     # -------------------------------------------
     # TODO: save the best model as a pkl for easy retrieval.
-    if cfg.get("OPTUNA", {}).get("ENABLED", False):
+    if cfg.optuna.enabled:
         tuner = OptunaTuner(
             x_train=x_train,
             y_train=y_train,
-            base_config=cfg,
-            n_trials=cfg.get("OPTUNA", {}).get("N_TRIALS", 50),
-            study_name=cfg.get("OPTUNA", {}).get("STUDY_NAME", "HAIKU_speaker_recognition"),
-            seed=cfg.get("SEED", 42),
+            config=cfg,
+            n_trials=cfg.optuna.n_trials,
+            study_name=cfg.optuna.study_name,
+            seed=cfg.seed,
         )
 
-        _ = tuner.optimize()
-
-        figures_dir.mkdir(parents=True, exist_ok=True)
-        study_dir.mkdir(parents=True, exist_ok=True)
-        best_config_dir.mkdir(parents=True, exist_ok=True)
+        _ = tuner.optimize(show_progress_bar=cfg.optuna.show_progress_bar)
 
         tuner.save_plots(output_dir=figures_dir)
         tuner.save_study(output_dir=study_dir / "optuna_study.pkl")
@@ -148,31 +140,33 @@ def main():
     # -------------------------------------------
     heading("Model Creation")
 
-    if cfg.get("MODEL", {}).get("LOAD_BEST_CONFIG", False):
+    if cfg.model.load_best_config:
         with open(best_config_dir / "best_model_config.yaml") as f:
             model_cfg = yaml.safe_load(f)
+            model_cfg = Model.from_dict(model_cfg)
             print("Loaded best model config:")
             print(yaml.safe_dump(model_cfg, sort_keys=True, default_flow_style=False))
     else:
-        model_cfg = cfg.get("MODEL", {})
+        model_cfg = cfg.model
     
     model = HAIKU.create_model(model_cfg)
     
     # Print detailed model summary
-    batch_size = model_cfg.get("BATCH_SIZE", 32)
+    batch_size = model_cfg.batch_size
 
     # Train the model
     history, avg_history = model.train_model(
         x_train,
         y_train,
-        learning_rate = model_cfg.get("LEARNING_RATE", 0.001),
-        num_epochs = model_cfg.get("NUM_EPOCHS", 500),  
+        learning_rate = model_cfg.learning_rate,
+        num_epochs = model_cfg.num_epochs,
         batch_size = batch_size,
-        k_folds= model_cfg.get("K_FOLDS", 5),
-        seed= cfg.get("SEED", 42)
+        k_folds= model_cfg.k_folds,
+        seed= cfg.seed
     )
-    
+
     figure_dir = Path("reports/figures")
+
     # plot the training history
     plot_training_history(history, figure_dir)
 

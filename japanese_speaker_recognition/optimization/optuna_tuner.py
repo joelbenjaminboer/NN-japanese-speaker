@@ -1,11 +1,11 @@
 from pathlib import Path
-from typing import Any, Literal
+from typing import Literal
 
 import optuna
 from optuna import Study, Trial
 from torch import Tensor
-import numpy as np
 
+from config.config import Config, Model, OptunaRanges
 from japanese_speaker_recognition.models.HAIKU import HAIKU
 from utils.utils import heading
 
@@ -15,14 +15,14 @@ class OptunaTuner:
         self,
         x_train: Tensor,
         y_train: Tensor,
-        base_config: dict[str, Any],
+        config: Config,
         n_trials: int = 50,
         study_name: str = "HAIKU_speaker_recognition",
         seed: int = 42,
     ):
         self.x_train = x_train
         self.y_train = y_train
-        self.base_config = base_config
+        self.config = config
         self.n_trials = n_trials
         self.study_name = study_name
         self.seed = seed
@@ -30,19 +30,21 @@ class OptunaTuner:
 
     @staticmethod
     def _tuning_ranges_from_config(
-        config: dict[str, Any]
+        optuna_ranges: OptunaRanges
         ) -> dict[str, tuple[float, float] | list[int]]:
         """requires only the ranges part of the yaml config"""
-        learning_rate_raw = list[float](config.get("LEARNING_RATE", [1e-5, 1e-2]))
-        dropout_raw = list[float](config.get("DROPOUT", [0.1, 0.5]))
-        conv_channels = list[int](config.get("CONV_CHANNELS", [64, 128, 256]))
-        hidden_dim = list[int](config.get("HIDDEN_DIM", [32, 64, 128]))
-        kernel_size = list[int](config.get("KERNEL_SIZE", [3, 5, 7]))
-        batch_size = list[int](config.get("BATCH_SIZE", [16, 32, 64]))
+        learning_rate_raw: list[float] = optuna_ranges.learning_rate
+        dropout_raw: list[float] = optuna_ranges.dropout
+        conv_channels: list[int] = optuna_ranges.conv_channels
+        hidden_dim: list[int] = optuna_ranges.hidden_dim
+        kernel_size: list[int] = optuna_ranges.kernel_size
+        batch_size: list[int] = optuna_ranges.batch_size
 
         # Convert 2-element lists to tuples for ranges
-        learning_rate = (float(learning_rate_raw[0]), float(learning_rate_raw[1]))
-        dropout = (float(dropout_raw[0]), float(dropout_raw[1]))
+        learning_rate: tuple[float, float] = (
+            float(learning_rate_raw[0]), float(learning_rate_raw[1])
+            )
+        dropout: tuple[float, float] = (float(dropout_raw[0]), float(dropout_raw[1]))
 
         return {
             "LEARNING_RATE": learning_rate,
@@ -55,14 +57,14 @@ class OptunaTuner:
 
     def _suggest_hyperparameters_from_config_ranges(self, trial: Trial) -> dict[str, int | float]:
         """Takes self.base_config and suggests hyperparameters."""
-        param_ranges_config = self.base_config.get("OPTUNA", {}).get("RANGES", {})
+        param_ranges_config: OptunaRanges = self.config.optuna.ranges
         suggested_params = self._tuning_ranges_from_config(param_ranges_config)
 
-        learning_rate_low = suggested_params["LEARNING_RATE"][0]
-        learning_rate_high = suggested_params["LEARNING_RATE"][1]
+        learning_rate_low: float = suggested_params["LEARNING_RATE"][0]
+        learning_rate_high: float = suggested_params["LEARNING_RATE"][1]
 
-        dropout_low = float(suggested_params["DROPOUT"][0])
-        dropout_high = float(suggested_params["DROPOUT"][1])
+        dropout_low: float = suggested_params["DROPOUT"][0]
+        dropout_high: float = suggested_params["DROPOUT"][1]
 
         return {
             "LEARNING_RATE": trial.suggest_float(
@@ -90,17 +92,17 @@ class OptunaTuner:
         suggested_params: dict[str, int | float]
         ) -> dict[str, int | float | str]:
         """Creates the model config from the suggested hyperparameters."""
-        model_config = self.base_config.get("MODEL", {})
+        model_config: Model = self.config.model
 
         return {
             "DROPOUT": suggested_params.get("DROPOUT", 0.3),
-            "EMBEDDING_DIM": model_config.get("embedding_dim", 64),
+            "EMBEDDING_DIM": model_config.embedding_dim,
             "KERNEL_SIZE": suggested_params.get("KERNEL_SIZE", 5),
             "CONV_CHANNELS": suggested_params.get("CONV_CHANNELS", 128),
             "HIDDEN_DIM": suggested_params.get("HIDDEN_DIM", 64),
-            "INPUT_CHANNELS": model_config.get("INPUT_CHANNELS", 12),
-            "NUM_CLASSES": model_config.get("NUM_CLASSES", 9),
-            "DEVICE": model_config.get("DEVICE", "cpu"),
+            "INPUT_CHANNELS": model_config.input_channels,
+            "NUM_CLASSES": model_config.num_classes,
+            "DEVICE": model_config.device,
         }
 
     def objective(self, trial: Trial) -> float:
@@ -109,14 +111,14 @@ class OptunaTuner:
 
         model = HAIKU._from_config(model_config)
 
-        num_epochs = self.base_config.get("MODEL", {}).get("NUM_EPOCHS", 10)
+        num_epochs = self.config.model.num_epochs
         history, avg_history = model.train_model(
             x_train=self.x_train,
             y_train=self.y_train,
             learning_rate=suggested_params["LEARNING_RATE"],
             num_epochs=num_epochs,
-            batch_size=suggested_params["BATCH_SIZE"],
-            k_folds=self.base_config.get("MODEL", {}).get("K_FOLDS", 5),
+            batch_size=int(suggested_params["BATCH_SIZE"]),
+            k_folds=self.config.model.k_folds,
             seed=self.seed,
         )
 
@@ -153,7 +155,7 @@ class OptunaTuner:
         self.study.optimize(
             self.objective,
             n_trials=self.n_trials,
-            # show_progress_bar=show_progress_bar,
+            show_progress_bar=show_progress_bar,
         )
 
         self._print_results()
@@ -164,19 +166,21 @@ class OptunaTuner:
             raise ValueError("Must run optimize() first.")
         
         best_params = self.study.best_params
-        model_section = self.base_config.get("MODEL", {})
+        model_section = self.config.model
         return {
             "DROPOUT": best_params["DROPOUT"],
-            "EMBEDDING_DIM": model_section["EMBEDDING_DIM"],
+            "EMBEDDING_DIM": model_section.embedding_dim,
             "KERNEL_SIZE": best_params["KERNEL_SIZE"],
             "CONV_CHANNELS": best_params["CONV_CHANNELS"],
             "HIDDEN_DIM": best_params["HIDDEN_DIM"],
-            "INPUT_CHANNELS": model_section.get("INPUT_CHANNELS", 12),
-            "NUM_CLASSES": model_section.get("NUM_CLASSES", 9),
-            "DEVICE": model_section.get("DEVICE", "cpu"),
+            "INPUT_CHANNELS": model_section.input_channels,
+            "NUM_CLASSES": model_section.num_classes,
+            "DEVICE": model_section.device,
             "LEARNING_RATE": best_params["LEARNING_RATE"],
             "BATCH_SIZE": best_params["BATCH_SIZE"],
-            "NUM_EPOCHS": model_section.get("NUM_EPOCHS", 100),
+            "NUM_EPOCHS": model_section.num_epochs,
+            "LOAD_BEST_CONFIG": model_section.load_best_config,
+            "K_FOLDS": model_section.k_folds,
         }
 
     def save_plots(self, output_dir: str | Path = ".") -> None:

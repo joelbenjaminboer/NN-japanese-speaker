@@ -11,6 +11,7 @@ from sklearn.preprocessing import StandardScaler
 
 # if you keep these helpers in your project:
 # japanese_speaker_recognition.data_augmentation as data_aug
+from config.config import Config
 from japanese_speaker_recognition.data_augmentation import AugmentationPipeline
 from japanese_speaker_recognition.data_embedding import EmbeddingPipeline
 
@@ -39,7 +40,7 @@ class JapaneseVowelsDataset:
 
     def __init__(
         self,
-        cfg: dict[str, Any],
+        cfg: Config,
         augmenter: AugmentationPipeline | None = None,
         embedding_dim: int = 64,
         embedding_model: str = "nomic-embed-text-v1.5",
@@ -60,37 +61,34 @@ class JapaneseVowelsDataset:
         
 
         # ---- Parse config ----
-        data_url = cfg.get("DATA_URL", "").rstrip("/") + "/"
-        in_dirs = cfg.get("INPUT_DIRS", {})
-        out_dirs = cfg.get("OUTPUT_DIRS", {})
-        aug_cfg = cfg.get("AUGMENTATION", {}) or {}
+        data_url = cfg.data_url.rstrip("/") + "/"
+        in_dirs = cfg.input_dirs
+        out_dirs = cfg.output_dirs
+        aug_cfg = cfg.augmentation 
 
-        self.max_len: int = int(cfg.get("MAX_LEN", 29))
-        self.n_features: int = int(cfg.get("N_FEATURES", 12))
+        self.max_len: int = cfg.max_length
+        self.n_features: int = cfg.n_features
 
-        self.pipeline_flags = {
-            "train": bool(cfg.get("PIPELINE", {}).get("TRAIN", True)),
-            "test": bool(cfg.get("PIPELINE", {}).get("TEST", False)),
-            "augment": bool(cfg.get("PIPELINE", {}).get("AUGMENT", False)),
+        self.pipeline_flags: dict[str, bool] = {
+            "train": cfg.pipeline.train,
+            "test": cfg.pipeline.test,
+            # "augment": aug_cfg.enabled,
         }
 
-        self.aug_enable: bool = bool(aug_cfg.get("AUGMENT", False))
-        self.aug_repeats: int = int(
-            aug_cfg.get("REPEATS", 0)
-        )  # optional; defaults to 0 if not in YAML
+        self.aug_enable: bool = aug_cfg.enabled
+        self.aug_repeats: int = aug_cfg.repeats
 
-        paths = DatasetPaths(
+        self.paths: DatasetPaths = DatasetPaths(
             data_url=data_url,
-            train_file=Path(in_dirs.get("TRAIN_FILE", "data/ae.train")),
-            test_file=Path(in_dirs.get("TEST_FILE", "data/ae.test")),
-            out_dir=Path(out_dirs.get("PROCESSED", "data/processed_data")),
-            aug_file=Path(aug_cfg.get("AUG_FILE"), "data/augmented"),
+            train_file=in_dirs.train_file_dir,
+            test_file=in_dirs.test_file_dir,
+            out_dir=out_dirs.processed_file_dir,
+            aug_file=aug_cfg.aug_dir,
         )
-        self.paths = paths
         self.paths.out_dir.mkdir(parents=True, exist_ok=True)
         
-        self.train_npz = self.paths.out_dir / f"train_{self.key}_data.npz"
-        self.test_npz = self.paths.out_dir / f"test_{self.key}_data.npz"
+        self.train_npz: Path = self.paths.out_dir / f"train_{self.key}_data.npz"
+        self.test_npz: Path = self.paths.out_dir / f"test_{self.key}_data.npz"
 
         self.scaler: StandardScaler | None = None  # fitted on train
 
@@ -133,12 +131,12 @@ class JapaneseVowelsDataset:
         # Optional augmentation
         # --------------------------
         y_train = self._generate_train_labels()
-        if self.pipeline_flags["augment"] and self.aug_enable and self.aug_repeats > 0:
+        if self.aug_enable and self.aug_repeats > 0:
             print("Augmentation enabled.")
             if not self.augmenter:
                 raise ValueError("Augmentation requested but no augmenter provided.")
 
-            print(f"Running data augmentation ({self.aug_repeats}× repeats)...")
+            print(f"Running data augmentation ({self.aug_repeats}x repeats)...")
             X_aug, y_aug = self._augment_repeat(
                 np.array(train_utts, dtype=object), y_train, repeats=self.aug_repeats
             )
@@ -218,8 +216,8 @@ class JapaneseVowelsDataset:
             "train_npz": str(self.train_npz),
             "test_npz": str(self.test_npz),
             }
-            
-            if self.pipeline_flags["augment"] and self.aug_enable and self.aug_repeats > 0:
+
+            if self.aug_enable and self.aug_repeats > 0:
                 out.update(
                     {
                         "X_augmented": X_train[-len(y_aug) :],
@@ -296,7 +294,7 @@ class JapaneseVowelsDataset:
         self, train_utts: list[np.ndarray], test_utts: list[np.ndarray]
     ) -> tuple[list[np.ndarray], list[np.ndarray]]:
         """
-        Min–max normalize each feature dimension of all utterances to [0, 1],
+        Min-max normalize each feature dimension of all utterances to [0, 1],
         using min and max computed across *all* training utterances.
         Args:
             train_utts (list[np.ndarray]): list of arrays (12, T_i) for training set
@@ -347,7 +345,8 @@ class JapaneseVowelsDataset:
             labels += [speaker_id] * utterances_per_speaker
         return np.array(labels, dtype=int)
 
-    def _generate_test_labels(self) -> np.ndarray:
+    @staticmethod
+    def _generate_test_labels() -> np.ndarray:
         block_sizes = [31, 35, 88, 44, 29, 24, 40, 50, 29]
         labels: list[int] = []
         for speaker_id, n in enumerate(block_sizes):

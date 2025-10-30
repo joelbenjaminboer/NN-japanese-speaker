@@ -40,7 +40,7 @@ OUTPUT_DIRS:
 
 #HAIKU
 MODEL:
-  LOAD_BEST_CONFIG: true # Whether to load the best config from Optuna. Only works if OPTUNA.ENABLED is true
+  LOAD_BEST_CONFIG: false # Whether to load the best config from Optuna. Only works if OPTUNA.ENABLED is true
   NUM_CLASSES: 9
   EMBEDDING_DIM: 64
   KERNEL_SIZE: 3
@@ -56,6 +56,7 @@ MODEL:
 
 OPTUNA:
   ENABLED: false
+  SHOW_PROGRESS_BAR: true
   N_TRIALS: 50
   STUDY_NAME: "HAIKU_speaker_recognition"
   FIGURES_DIR: "reports/optuna/figures"

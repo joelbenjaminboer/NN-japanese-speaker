@@ -2,14 +2,14 @@ from typing import Self
 
 import torch
 import torch.nn as nn
+from sklearn.model_selection import KFold
 from torch.nn.modules.container import Sequential
 from torch.nn.modules.pooling import AdaptiveAvgPool1d
-from torch.utils.data import DataLoader, TensorDataset, random_split
+from torch.utils.data import DataLoader, Subset, TensorDataset
 from tqdm import tqdm
 from typing_extensions import override
-from torch.utils.data import random_split
-from torch.utils.data import Subset
 
+from config.config import Model
 from utils.utils import heading
 
 
@@ -47,7 +47,7 @@ class HAIKU(nn.Module):
     ):
         super().__init__()
         self.embedding_dim: int = embedding_dim
-        self.device = self._get_device(device)
+        self.device: str = self._get_device(device)
 
         # Single convolutional layer
         padding = kernel_size // 2
@@ -102,7 +102,7 @@ class HAIKU(nn.Module):
         return x.squeeze(-1)  # [B, 128]
 
     @classmethod
-    def _from_config(cls, config: dict[str, int | float | str]) -> Self:
+    def _from_config(cls, model_cfg: Model) -> Self:
         """
         Create SpeakerCNN from configuration dictionary.
         Args:
@@ -111,12 +111,12 @@ class HAIKU(nn.Module):
             SpeakerCNN instance
         """
         return cls(
-            dropout=float(config.get("DROPOUT", 0.3)),
-            embedding_dim=int(config.get("EMBEDDING_DIM", 64)),
-            kernel_size=int(config.get("KERNEL_SIZE", 5)),
-            conv_channels=int(config.get("CONV_CHANNELS", 128)),
-            hidden_dim=int(config.get("HIDDEN_DIM", 64)),
-            device=str(config.get("DEVICE", "cpu")),
+            dropout=model_cfg.dropout,
+            embedding_dim=model_cfg.embedding_dim,
+            kernel_size=model_cfg.kernel_size,
+            conv_channels=model_cfg.conv_channels,
+            hidden_dim=model_cfg.hidden_dim,
+            device=model_cfg.device,
         )
     
     @staticmethod
@@ -151,8 +151,9 @@ class HAIKU(nn.Module):
             print("Using CPU")
 
         return device
-    
-    def _init_weights(self, m):
+
+    @staticmethod
+    def _init_weights(m):
         if isinstance(m, (nn.Linear, nn.Conv1d, nn.Conv2d)):
             nn.init.xavier_uniform_(m.weight)
             if m.bias is not None:
@@ -160,7 +161,7 @@ class HAIKU(nn.Module):
 
 
     @classmethod
-    def create_model(cls, model_cfg: dict[str, int | float | str]) -> Self:
+    def create_model(cls, model_cfg: Model) -> Self:
         """Create HAIKU model from configuration."""
         model = cls._from_config(model_cfg)
 
@@ -169,13 +170,13 @@ class HAIKU(nn.Module):
 
         print("Model created:")
         print(
-            f"  - Input: [Batch, {model_cfg.get('INPUT_CHANNELS', 12)}, \
-            {model_cfg.get('EMBEDDING_DIM', 64)}]"
+            f"  - Input: [Batch, {model_cfg.input_channels}, \
+            {model_cfg.embedding_dim}]"
         )
-        print(f"  - Conv channels: {model_cfg.get('CONV_CHANNELS', 128)}")
-        print(f"  - Kernel size: {model_cfg.get('KERNEL_SIZE', 3)}")
-        print(f"  - Hidden dim: {model_cfg.get('HIDDEN_DIM', 64)}")
-        print(f"  - Output: [Batch, {model_cfg.get('NUM_CLASSES', 9)}]")
+        print(f"  - Conv channels: {model_cfg.conv_channels}")
+        print(f"  - Kernel size: {model_cfg.kernel_size}")
+        print(f"  - Hidden dim: {model_cfg.hidden_dim}")
+        print(f"  - Output: [Batch, {model_cfg.num_classes}]")
         print(f"  - Total parameters: {total_params:,}")
         print(f"  - Trainable parameters: {trainable_params:,}")
 
@@ -196,8 +197,8 @@ class HAIKU(nn.Module):
         torch.manual_seed(seed)
         self.to(self.device)
 
-        heading(f"Training for {num_epochs} epochs with {k_folds}-Fold cross-validation "
-                f"(lr={learning_rate}, device={self.device})")
+        heading(f"Training for {num_epochs} epochs with {k_folds}-Fold cross-validation \
+            (lr={learning_rate}, device={self.device})")
 
         full_dataset = TensorDataset(x_train, y_train)
         kf = KFold(n_splits=k_folds, shuffle=True, random_state=seed)
@@ -217,7 +218,7 @@ class HAIKU(nn.Module):
             val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
 
             # Reinitialize model weights before each fold
-            self.apply(self._init_weights)
+            _ = self.apply(self._init_weights)
 
             optimizer = torch.optim.RAdam(self.parameters(), lr=learning_rate)
             criterion = nn.CrossEntropyLoss()
@@ -234,21 +235,21 @@ class HAIKU(nn.Module):
             # Validation step
             val_loss, val_acc = self.evaluate(val_loader, criterion)
 
-                fold_hist["train_loss"].append(train_loss)
-                fold_hist["train_acc"].append(train_acc)
-                fold_hist["val_loss"].append(val_loss)
-                fold_hist["val_acc"].append(val_acc)
-                global_history["train_loss"].append(train_loss)
-                global_history["train_acc"].append(train_acc)
-                global_history["val_loss"].append(val_loss)
-                global_history["val_acc"].append(val_acc)
+            fold_hist["train_loss"].append(train_loss)
+            fold_hist["train_acc"].append(train_acc)
+            fold_hist["val_loss"].append(val_loss)
+            fold_hist["val_acc"].append(val_acc)
+            global_history["train_loss"].append(train_loss)
+            global_history["train_acc"].append(train_acc)
+            global_history["val_loss"].append(val_loss)
+            global_history["val_acc"].append(val_acc)
 
-                epoch_bar.set_postfix(
-                    train_loss=f'{train_loss:.4f}',
-                    train_acc=f'{train_acc:.2f}%',
-                    val_loss=f'{val_loss:.4f}',
-                    val_acc=f'{val_acc:.2f}%'
-                )
+            epoch_bar.set_postfix(
+                train_loss=f'{train_loss:.4f}',
+                train_acc=f'{train_acc:.2f}%',
+                val_loss=f'{val_loss:.4f}',
+                val_acc=f'{val_acc:.2f}%'
+            )
 
             # Average metrics over epochs for this fold
             for key in history:
