@@ -260,7 +260,7 @@ class HAIKU(nn.Module):
         print(f"Avg Train Acc: {averaged_history['train_acc']:.2f}%")
         print(f"Avg Val Acc:   {averaged_history['val_acc']:.2f}%")
 
-        return global_history
+        return global_history, averaged_history
 
 
 

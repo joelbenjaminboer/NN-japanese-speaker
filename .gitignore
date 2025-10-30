@@ -4,6 +4,7 @@
 !data/**/.gitkeep
 reports/optuna/
 !reports/optuna/**/.gitkeep
+/habrok_outputs/**
 
 # Mac OS-specific storage files
 .DS_Store

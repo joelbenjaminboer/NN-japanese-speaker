@@ -50,13 +50,13 @@ MODEL:
   HIDDEN_DIM: 64
   LEARNING_RATE: 0.007
   BATCH_SIZE: 32
-  NUM_EPOCHS: 1000
-  K_FOLDS: 5
+  NUM_EPOCHS: 10
+  K_FOLDS: 2
   DEVICE: "auto"  # Options: "cuda", "cpu", "auto"
 
 OPTUNA:
   ENABLED: true
-  N_TRIALS: 10
+  N_TRIALS: 2
   STUDY_NAME: "HAIKU_speaker_recognition"
   FIGURES_DIR: "reports/optuna/figures"
   STUDY_DIR: "reports/optuna/study"

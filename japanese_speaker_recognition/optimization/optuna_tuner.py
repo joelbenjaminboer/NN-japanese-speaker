@@ -110,7 +110,7 @@ class OptunaTuner:
         model = HAIKU._from_config(model_config)
 
         num_epochs = self.base_config.get("MODEL", {}).get("NUM_EPOCHS", 10)
-        history = model.train_model(
+        history, avg_history = model.train_model(
             x_train=self.x_train,
             y_train=self.y_train,
             learning_rate=suggested_params["LEARNING_RATE"],
@@ -120,7 +120,8 @@ class OptunaTuner:
             seed=self.seed,
         )
 
-        best_val_acc = np.mean(history["val_acc"])
+        best_val_acc = avg_history["val_acc"]
+        
         print(f"Best validation accuracy: {best_val_acc:.4f}")
         return best_val_acc
 

@@ -150,7 +150,7 @@ def main():
     batch_size = model_cfg.get("BATCH_SIZE", 32)
 
     # Train the model
-    history = model.train_model(
+    history, avg_history = model.train_model(
         x_train,
         y_train,
         learning_rate = model_cfg.get("LEARNING_RATE", 0.001),
