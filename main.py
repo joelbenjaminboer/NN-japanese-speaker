@@ -94,6 +94,8 @@ def main():
     x_test = torch.tensor(x_test, dtype=torch.float32)
     y_test = torch.tensor(y_test, dtype=torch.long)
     
+    print(f"Training data shape: {x_train.shape}, Training labels shape: {y_train.shape}")
+    
     # quick summary (shapes + file outputs)
     heading("Artifacts")
 

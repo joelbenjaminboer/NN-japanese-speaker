@@ -134,6 +134,7 @@ class JapaneseVowelsDataset:
         # --------------------------
         y_train = self._generate_train_labels()
         if self.pipeline_flags["augment"] and self.aug_enable and self.aug_repeats > 0:
+            print("Augmentation enabled.")
             if not self.augmenter:
                 raise ValueError("Augmentation requested but no augmenter provided.")
 

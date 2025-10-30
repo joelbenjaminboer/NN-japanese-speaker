@@ -55,8 +55,8 @@ MODEL:
   DEVICE: "auto"  # Options: "cuda", "cpu", "auto"
 
 OPTUNA:
-  ENABLED: true
-  N_TRIALS: 2
+  ENABLED: false
+  N_TRIALS: 50
   STUDY_NAME: "HAIKU_speaker_recognition"
   FIGURES_DIR: "reports/optuna/figures"
   STUDY_DIR: "reports/optuna/study"
