@@ -10,7 +10,7 @@ MAX_LEN: 29  # longest utterance length (7–29)
 N_FEATURES: 12
 
 AUGMENTATION:
-  AUGMENT: false
+  AUGMENT: true
   REPEATS: 100
   AUG_FILE: "data/augmented_data.npz"
   SEED: 42
@@ -27,9 +27,10 @@ AUGMENTATION:
 
 EMBEDDING:
   MODEL: "nomic-embed-text-v1.5"
-  DIMENSION: 64
+  DIMENSION: 512
   PRE_PRECISION: 2
   OUTPUT_FILE: "data/processed_data/"
+  KEY: "augment512"
 
 INPUT_DIRS:
   TRAIN_FILE: "data/ae.train"
@@ -40,7 +41,7 @@ OUTPUT_DIRS:
 
 #HAIKU
 MODEL:
-  LOAD_BEST_CONFIG: true # Whether to load the best config from Optuna. Only works if OPTUNA.ENABLED is true
+  LOAD_BEST_CONFIG: false # Whether to load the best config from Optuna. Only works if OPTUNA.ENABLED is true
   NUM_CLASSES: 9
   EMBEDDING_DIM: 64
   KERNEL_SIZE: 3
@@ -50,13 +51,13 @@ MODEL:
   HIDDEN_DIM: 64
   LEARNING_RATE: 0.007
   BATCH_SIZE: 32
-  NUM_EPOCHS: 10
-  K_FOLDS: 2
+  NUM_EPOCHS: 10000
+  K_FOLDS: 5
   DEVICE: "auto"  # Options: "cuda", "cpu", "auto"
 
 OPTUNA:
   ENABLED: false
-  N_TRIALS: 50
+  N_TRIALS: 2
   STUDY_NAME: "HAIKU_speaker_recognition"
   FIGURES_DIR: "reports/optuna/figures"
   STUDY_DIR: "reports/optuna/study"
