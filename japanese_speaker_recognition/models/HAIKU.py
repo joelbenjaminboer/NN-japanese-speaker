@@ -1,4 +1,4 @@
-from typing import Self
+from typing import Self, TypeAlias
 
 import torch
 import torch.nn as nn
@@ -12,6 +12,7 @@ from typing_extensions import override
 from config.config import Model
 from utils.utils import heading
 
+BatchData: TypeAlias = tuple[torch.Tensor, torch.Tensor]
 
 class HAIKU(nn.Module):
     """
@@ -191,7 +192,7 @@ class HAIKU(nn.Module):
         batch_size: int = 32,
         k_folds: int = 5,
         seed: int = 42
-    ) -> dict:
+    ) -> tuple[dict[str, list[float]], dict[str, float]]:
         """Train the model using K-Fold cross-validation and return averaged training history."""
 
         torch.manual_seed(seed)
@@ -204,7 +205,10 @@ class HAIKU(nn.Module):
         kf = KFold(n_splits=k_folds, shuffle=True, random_state=seed)
 
         # Store averaged metrics across folds
-        history = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
+        history: dict[str, list[float]] = {
+            "train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []
+        }
+        fold: int = 0
 
         # Loop through folds
         for fold, (train_idx, val_idx) in enumerate(kf.split(x_train)):
@@ -226,7 +230,14 @@ class HAIKU(nn.Module):
             # Track metrics for this fold
             fold_hist = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
 
-            epoch_bar = tqdm(range(num_epochs), desc=f"Fold {fold + 1}", leave=False)
+        epoch_bar = tqdm(range(num_epochs), desc=f"Fold {fold + 1}", leave=False)
+
+        fold_hist: dict[str, list[float]] = {
+            "train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []
+        }
+        global_history: dict[str, list[float]] = {
+            "train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []
+        }
 
         for _epoch in epoch_bar:
             # Training step
@@ -264,11 +275,9 @@ class HAIKU(nn.Module):
 
         return global_history, averaged_history
 
-
-
     def _train_step(
         self,
-        dataloader: DataLoader,
+        dataloader: DataLoader[BatchData],
         optimizer: torch.optim.Optimizer,
         criterion: nn.Module,
     ) -> tuple[float, float]:
@@ -297,7 +306,7 @@ class HAIKU(nn.Module):
         return avg_loss, accuracy
 
     def evaluate(
-        self, dataloader: DataLoader, criterion: nn.Module
+        self, dataloader: DataLoader[BatchData], criterion: nn.Module
     ) -> tuple[float, float]:
         """Evaluate model on validation/test set."""
         self.eval()

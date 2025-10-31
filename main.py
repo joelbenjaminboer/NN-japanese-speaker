@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 import matplotlib.pyplot as plt
 import torch
@@ -9,43 +8,13 @@ import torch.nn as nn
 import yaml
 from torch.utils.data import TensorDataset
 
+from config.config import Config, Model
 from japanese_speaker_recognition.data_augmentation import AugmentationPipeline
 from japanese_speaker_recognition.dataset import JapaneseVowelsDataset
 from japanese_speaker_recognition.models.HAIKU import HAIKU
 from japanese_speaker_recognition.optimization.optuna_tuner import OptunaTuner
 from utils.utils import heading
 
-from config.config import Config, Model
-
-
-# def load_config(path: str | Path = "config.yaml") -> dict[str, Any]:
-#     p = Path(path)
-#     if not p.exists():
-#         raise FileNotFoundError(f"Config not found: {p.resolve()}")
-#     with p.open("r", encoding="utf-8") as f:
-#         return yaml.safe_load(f) or {}
-
-def print_model_summary(model: nn.Module, input_shape: tuple):
-    """Print detailed model architecture."""
-    heading("Model Architecture")
-    print(model)
-
-    heading("Layer-by-layer output shapes")
-    dummy_input = torch.randn(*input_shape)
-    model.eval()
-
-    with torch.no_grad():
-        x = dummy_input
-        print(f"Input: {x.shape}")
-
-        x = model.conv(x)
-        print(f"After Conv: {x.shape}")
-
-        x = model.global_pool(x)
-        print(f"After Global Pool: {x.shape}")
-
-        logits = model.classifier(x)
-        print(f"After Classifier (MLP): {logits.shape}")
 
 def plot_training_history(history: dict, figure_dir: Path) -> None:
     """Plot training history."""
@@ -150,8 +119,7 @@ def main():
         model_cfg = cfg.model
     
     model = HAIKU.create_model(model_cfg)
-    
-    # Print detailed model summary
+
     batch_size = model_cfg.batch_size
 
     # Train the model
@@ -174,7 +142,7 @@ def main():
     heading("Training Complete")
     print(f"Final Train Accuracy: {history['train_acc'][-1]:.2f}%")
     print(f"Final Validation Accuracy: {history['val_acc'][-1]:.2f}%")
-    
+
     # -------------------------------------------
     # Model Evaluation
     # -------------------------------------------
