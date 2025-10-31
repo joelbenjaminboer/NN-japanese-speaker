@@ -5,21 +5,25 @@ Wrapper class around scikit-learn's RandomForestClassifier
 for the Japanese Vowels dataset.
 """
 
+from typing import Self
+
 import numpy as np
-from numpy import ndarray
+from numpy.typing import NDArray
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, classification_report
 from typing_extensions import override
 
-from ..core.base import BaseModel
-from ..core.registry import register_model
 
+class RandomForestWrapper(RandomForestClassifier):
 
-@register_model("random_forest")
-class RandomForestWrapper(BaseModel):
-    name = "random_forest"
-
-    def __init__(self, n_estimators=200, max_depth=None, random_state=42, n_jobs=-1, **kwargs):
+    def __init__(
+        self, 
+        n_estimators: int = 200,
+        max_depth: int | None = None,
+        random_state: int = 42,
+        n_jobs: int = -1,
+        **kwargs
+    ):
         """
         Initialize a RandomForest classifier with desired hyperparameters.
         """
@@ -30,7 +34,6 @@ class RandomForestWrapper(BaseModel):
             n_jobs=n_jobs,
             **kwargs,
         )
-        self.clf = RandomForestClassifier(**self.params)
 
     @staticmethod
     def load_npz(train_file, test_file):
@@ -49,7 +52,7 @@ class RandomForestWrapper(BaseModel):
         return X_train, y_train, X_test, y_test
 
     @staticmethod
-    def flatten(x: ndarray) -> ndarray:
+    def flatten(x:  NDArray[np.float_]) ->  NDArray[np.float_]:
         """
         Flatten a (samples, time, features) array to (samples, time*features)
         for use in classical ML models.
@@ -57,27 +60,20 @@ class RandomForestWrapper(BaseModel):
         return x.reshape(x.shape[0], -1)
 
     @override
-    def fit(self, x: ndarray, y: ndarray):
+    def fit(
+        self, 
+        X: NDArray[np.float_], 
+        y: NDArray[np.int_], 
+        sample_weight: NDArray[np.float_] | None = None
+        ) -> Self:
         """
         Train the RandomForest model.
         """
-        print("Training Random Forest...")
-        self.clf.fit(x, y)
-        self._is_fitted = True
+        print(f"Training Random Forest with {getattr(self, 'n_estimators', 'unknown')} \
+            estimators...")
+        super().fit(X, y, sample_weight=sample_weight)
+        print("Training complete!")
         return self
-
-    def predict(self, x: ndarray):
-        """
-        Predict labels for input samples.
-        """
-        if not self._is_fitted:
-            raise RuntimeError("Model not trained yet. Call `.fit()` first.")
-        return self.clf.predict(x)
-
-    def predict_proba(self, x: ndarray):
-        if not self._is_fitted:
-            raise RuntimeError("Model not trained yet. Call `.fit()` first.")
-        return self.clf.predict_proba(x)
 
     def evaluate(self, X_test, y_test):
         """
@@ -87,11 +83,15 @@ class RandomForestWrapper(BaseModel):
         """
         if np.all(y_test == -1):
             print("Test labels unknown")
-            return None
+            return 0.0
 
         y_pred = self.predict(X_test)
         acc = accuracy_score(y_test, y_pred)
-        print(f"Accuracy: {acc:.3f}")
-        print("\nDetailed report:")
+        
+        print(f"\n{'='*50}")
+        print(f"Accuracy: {acc:.4f} ({acc*100:.2f}%)")
+        print(f"{'='*50}")
+        print("\nClassification Report:")
         print(classification_report(y_test, y_pred))
+        
         return acc
