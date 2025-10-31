@@ -32,9 +32,10 @@ dependencies = [
     "pyyaml>=6.0.3",
     "ruff>=0.14.1",
     "scikit-learn>=1.7.2",
+    "seaborn>=0.13.2",
     "sentence-transformers>=5.1.2",
     "torch==2.2.0",
-    "torchvision==0.17.0"
+    "torchvision==0.17.0",
 ]
 
 [[tool.uv.index]]

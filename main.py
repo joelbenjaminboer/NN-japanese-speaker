@@ -55,7 +55,11 @@ def main():
     # Prep the dataset
     # -------------------------------------------
     heading("Preparing dataset")
-    ds = JapaneseVowelsDataset(cfg, augmenter=augmenter)
+    embed_cfg = cfg.get("EMBEDDING") or {}
+    ds = JapaneseVowelsDataset(cfg, 
+                               augmenter=augmenter,
+                               embedding_dim=embed_cfg.get("DIMENSION", 64),
+                               key=embed_cfg.get("KEY", None))
     artifacts = ds.prepare()
     x_train = artifacts["X_train"]
     y_train = artifacts["y_train"]

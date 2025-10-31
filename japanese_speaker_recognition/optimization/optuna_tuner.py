@@ -55,6 +55,7 @@ class OptunaTuner:
             "BATCH_SIZE": batch_size,
         }
 
+
     def _suggest_hyperparameters_from_config_ranges(self, trial: Trial) -> dict[str, int | float]:
         """Takes self.base_config and suggests hyperparameters."""
         param_ranges_config: OptunaRanges = self.config.optuna.ranges
@@ -148,23 +149,34 @@ class OptunaTuner:
         self,
         direction: Literal["minimize", "maximize"] = "maximize",
         show_progress_bar: bool = True,
-        ) -> Study:
+        storage_url: str | None = None,   # <--- NEW
+    ) -> Study:
         heading("Starting Hyperparameter Optimization")
+
+        # Use shared database for parallel jobs
+        if storage_url is None:
+            storage_url = "sqlite:///optuna_study.db"  # works on shared filesystem
+            # or for PostgreSQL (better for many nodes):
+            # storage_url = "postgresql://user:password@host:port/dbname"
 
         self.study = optuna.create_study(
             direction=direction,
             study_name=self.study_name,
             sampler=optuna.samplers.TPESampler(seed=self.seed),
+            storage=storage_url,  # <--- NEW
+            load_if_exists=True,  # <--- allows multiple workers
         )
 
         self.study.optimize(
             self.objective,
             n_trials=self.n_trials,
             show_progress_bar=show_progress_bar,
+            n_jobs=1,  # Optuna parallelism handled at the SLURM job level
         )
 
         self._print_results()
         return self.study
+
 
     def get_best_config(self) -> dict[str, int | float | str]:
         if self.study is None:
