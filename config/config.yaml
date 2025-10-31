@@ -1,17 +1,12 @@
 DATA_URL: "https://archive.ics.uci.edu/ml/machine-learning-databases/JapaneseVowels/"
 
 SEED: 42
-
-PIPELINE: # Change these for the pipeline
-  TRAIN: True
-  TEST: False
-
 MAX_LEN: 29  # longest utterance length (7–29)
 N_FEATURES: 12
 
 AUGMENTATION:
-  AUGMENT: false
-  REPEATS: 100
+  AUGMENT: true
+  REPEATS: 2
   AUG_FILE: "data/augmented_data.npz"
   SEED: 42
   STEPS:
@@ -40,7 +35,7 @@ OUTPUT_DIRS:
 
 #HAIKU
 MODEL:
-  LOAD_BEST_CONFIG: false # Whether to load the best config from Optuna. Only works if OPTUNA.ENABLED is true
+  LOAD_BEST_CONFIG: true # Whether to load the best config from Optuna. Only works if OPTUNA.ENABLED is true
   NUM_CLASSES: 9
   EMBEDDING_DIM: 64
   KERNEL_SIZE: 3
@@ -55,9 +50,9 @@ MODEL:
   DEVICE: "auto"  # Options: "cuda", "cpu", "auto"
 
 OPTUNA:
-  ENABLED: false
+  ENABLED: true
   SHOW_PROGRESS_BAR: true
-  N_TRIALS: 50
+  N_TRIALS: 2
   STUDY_NAME: "HAIKU_speaker_recognition"
   FIGURES_DIR: "reports/optuna/figures"
   STUDY_DIR: "reports/optuna/study"

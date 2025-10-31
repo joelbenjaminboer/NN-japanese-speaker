@@ -105,25 +105,6 @@ class Embedding:
             output_dir=Path(data['OUTPUT_FILE'])
         )
 
-@deprecated("Keys arent used in code.")
-@dataclass
-class Pipeline:
-    """Configuration for pipeline execution."""
-    train: bool
-    test: bool
-
-    @override
-    def __str__(self) -> str:
-        return f"Pipeline:\n  Train: {self.train}\n  Test: {self.test}"
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "Pipeline":
-        """Create Pipeline from dictionary."""
-        return cls(
-            train=data['TRAIN'],
-            test=data['TEST']
-        )
-
 
 @dataclass
 class InputDirs:
@@ -303,7 +284,6 @@ class Config:
     """Main configuration class containing all settings."""
     data_url: str
     seed: int
-    pipeline: Pipeline
     max_length: int
     n_features: int
     augmentation: Augmentation
@@ -322,8 +302,6 @@ class Config:
             f"Seed: {self.seed}",
             f"Max Length: {self.max_length}",
             f"N Features: {self.n_features}",
-            "",
-            str(self.pipeline),
             "",
             str(self.augmentation),
             "",
@@ -369,7 +347,6 @@ class Config:
         return cls(
             data_url=data['DATA_URL'],
             seed=data['SEED'],
-            pipeline=Pipeline.from_dict(data['PIPELINE']),
             max_length=data['MAX_LEN'],
             n_features=data['N_FEATURES'],
             augmentation=Augmentation.from_dict(data['AUGMENTATION']),

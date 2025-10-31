@@ -69,12 +69,6 @@ class JapaneseVowelsDataset:
         self.max_len: int = cfg.max_length
         self.n_features: int = cfg.n_features
 
-        self.pipeline_flags: dict[str, bool] = {
-            "train": cfg.pipeline.train,
-            "test": cfg.pipeline.test,
-            # "augment": aug_cfg.enabled,
-        }
-
         self.aug_enable: bool = aug_cfg.enabled
         self.aug_repeats: int = aug_cfg.repeats
 
@@ -137,10 +131,22 @@ class JapaneseVowelsDataset:
                 raise ValueError("Augmentation requested but no augmenter provided.")
 
             print(f"Running data augmentation ({self.aug_repeats}x repeats)...")
+            # Pad sequences before augmentation
+            X_train_padded, _ = self._pad_sequences(train_utts, self.max_len)
+            
             X_aug, y_aug = self._augment_repeat(
-                np.array(train_utts, dtype=object), y_train, repeats=self.aug_repeats
+                X_train_padded, y_train, repeats=self.aug_repeats
             )
-            train_utts_aug = [np.array(utt, dtype=float) for utt in X_aug]
+            
+            # Convert augmented padded arrays back to list of variable-length arrays
+            # by removing padding
+            train_utts_aug = []
+            for i, aug_seq in enumerate(X_aug):
+                # Find the actual length (before padding was added)
+                # For simplicity, keep the full padded sequence or implement unpadding logic
+                # Here we'll transpose back to (12, T) format
+                train_utts_aug.append(aug_seq.T)  # Shape: (max_len, 12) -> (12, max_len)
+            
             train_utts += train_utts_aug
             y_train = np.concatenate([y_train, y_aug])
             print(f"Augmented training set: now {len(train_utts)} utterances total.")
@@ -188,7 +194,7 @@ class JapaneseVowelsDataset:
             "test_npz": str(self.test_npz),
             }
 
-            if self.pipeline_flags["augment"] and self.aug_enable and self.aug_repeats > 0:
+            if self.aug_enable and self.aug_repeats > 0:
                 out.update(
                     {
                         "X_augmented": X_train[-len(y_aug) :],
@@ -280,14 +286,15 @@ class JapaneseVowelsDataset:
         self, sequences: list[np.ndarray], maxlen: int
     ) -> tuple[np.ndarray, np.ndarray]:
         n_samples = len(sequences)
-        n_features = sequences[0].shape[1]
+        n_features = sequences[0].shape[0]  # First dimension is features
         X = np.zeros((n_samples, maxlen, n_features), dtype=np.float32)
         lengths = np.zeros(n_samples, dtype=int)
 
         for i, seq in enumerate(sequences):
-            T = seq.shape[0]
+            T = seq.shape[1]  # Second dimension is time
             lengths[i] = T
-            X[i, :T, :] = seq
+            # Transpose from (n_features, T) to (T, n_features) before storing
+            X[i, :T, :] = seq.T
         return X, lengths
 
     def _minmax_normalize_train_test(

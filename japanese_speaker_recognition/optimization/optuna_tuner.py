@@ -90,20 +90,25 @@ class OptunaTuner:
     def _create_model_config(
         self,
         suggested_params: dict[str, int | float]
-        ) -> dict[str, int | float | str]:
+        ) -> Model:
         """Creates the model config from the suggested hyperparameters."""
         model_config: Model = self.config.model
 
-        return {
-            "DROPOUT": suggested_params.get("DROPOUT", 0.3),
-            "EMBEDDING_DIM": model_config.embedding_dim,
-            "KERNEL_SIZE": suggested_params.get("KERNEL_SIZE", 5),
-            "CONV_CHANNELS": suggested_params.get("CONV_CHANNELS", 128),
-            "HIDDEN_DIM": suggested_params.get("HIDDEN_DIM", 64),
-            "INPUT_CHANNELS": model_config.input_channels,
-            "NUM_CLASSES": model_config.num_classes,
-            "DEVICE": model_config.device,
-        }
+        return Model(
+            load_best_config=model_config.load_best_config,
+            num_classes=model_config.num_classes,
+            embedding_dim=model_config.embedding_dim,
+            kernel_size=int(suggested_params.get("KERNEL_SIZE", 3)),
+            conv_channels=int(suggested_params.get("CONV_CHANNELS", 32)),
+            dropout=float(suggested_params.get("DROPOUT", 0.1)),
+            input_channels=model_config.input_channels,
+            hidden_dim=int(suggested_params.get("HIDDEN_DIM", 64)),
+            learning_rate=float(suggested_params.get("LEARNING_RATE", 1e-4)),
+            batch_size=int(suggested_params.get("BATCH_SIZE", 32)),
+            num_epochs=model_config.num_epochs,
+            k_folds=model_config.k_folds,
+            device=model_config.device
+        )
 
     def objective(self, trial: Trial) -> float:
         suggested_params = self._suggest_hyperparameters_from_config_ranges(trial)

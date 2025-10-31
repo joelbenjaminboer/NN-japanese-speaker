@@ -114,7 +114,7 @@ def main():
             model_cfg = yaml.safe_load(f)
             model_cfg = Model.from_dict(model_cfg)
             print("Loaded best model config:")
-            print(yaml.safe_dump(model_cfg, sort_keys=True, default_flow_style=False))
+            print(model_cfg)
     else:
         model_cfg = cfg.model
     
