@@ -84,6 +84,7 @@ class Embedding:
     dimension: int
     pre_precision: int
     output_dir: Path
+    key: str
 
     @override
     def __str__(self) -> str:
@@ -92,7 +93,8 @@ class Embedding:
             f"  Model: {self.model}\n"
             f"  Dimension: {self.dimension}\n"
             f"  Pre-precision: {self.pre_precision}\n"
-            f"  Output Dir: {self.output_dir}"
+            f"  Output Dir: {self.output_dir}\n"
+            f"  Key: {self.key}"
         )
 
     @classmethod
@@ -102,7 +104,8 @@ class Embedding:
             model=data['MODEL'],
             dimension=data['DIMENSION'],
             pre_precision=data['PRE_PRECISION'],
-            output_dir=Path(data['OUTPUT_FILE'])
+            output_dir=Path(data['OUTPUT_FILE']),
+            key=data['KEY'],
         )
 
 

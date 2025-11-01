@@ -1,6 +1,6 @@
-import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 import seaborn as sns
 
 # === CONFIG ===
@@ -11,7 +11,7 @@ n_features = 12
 utterances = []
 block = []
 
-with open(file_path, "r") as f:
+with open(file_path) as f:
     for line in f:
         line = line.strip()
         if not line:
@@ -66,4 +66,4 @@ sns.heatmap(
 plt.title(f"Frame-level correlation ({file_path})", fontsize=13)
 
 plt.tight_layout()
-plt.savefig(f"frame_level_correlation.png", dpi=300)
+plt.savefig("frame_level_correlation.png", dpi=300)
