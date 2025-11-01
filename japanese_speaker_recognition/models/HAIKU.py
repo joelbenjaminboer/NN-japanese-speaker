@@ -3,16 +3,21 @@ from typing import Self, TypeAlias
 import torch
 import torch.nn as nn
 from sklearn.model_selection import KFold
+
+# from sklearn.model_selection._split import KFold
 from torch.nn.modules.container import Sequential
 from torch.nn.modules.pooling import AdaptiveAvgPool1d
 from torch.utils.data import DataLoader, Subset, TensorDataset
+
+# from torch.utils.data.dataloader import DataLoader
 from tqdm import tqdm
 from typing_extensions import override
 
 from config.config import Model
 from utils.utils import heading
 
-BatchData: TypeAlias = tuple[torch.Tensor, torch.Tensor]
+# BatchData: TypeAlias = tuple[torch.Tensor, torch.Tensor]
+TrainDataset: TypeAlias = TensorDataset | Subset[TensorDataset]
 
 class HAIKU(nn.Module):
     """
@@ -202,10 +207,15 @@ class HAIKU(nn.Module):
             (lr={learning_rate}, device={self.device})")
 
         full_dataset = TensorDataset(x_train, y_train)
-        kf = KFold(n_splits=k_folds, shuffle=True, random_state=seed)
+        kf: KFold = KFold(n_splits=k_folds, shuffle=True, random_state=seed)
 
-        # Store averaged metrics across folds
         history: dict[str, list[float]] = {
+            "train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []
+        }
+        fold_hist: dict[str, list[float]] = {
+            "train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []
+        }
+        global_history: dict[str, list[float]] = {
             "train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []
         }
         fold: int = 0
@@ -213,7 +223,7 @@ class HAIKU(nn.Module):
         # Loop through folds
         for fold, (train_idx, val_idx) in enumerate(kf.split(x_train)):
             print(f"\n{'='*20} Fold {fold + 1}/{k_folds} {'='*20}")
-            global_history = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
+            # global_history = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
             # Split dataset
             train_subset = Subset(full_dataset, train_idx)
             val_subset = Subset(full_dataset, val_idx)
@@ -227,40 +237,33 @@ class HAIKU(nn.Module):
             optimizer = torch.optim.RAdam(self.parameters(), lr=learning_rate)
             criterion = nn.CrossEntropyLoss()
 
-            # Track metrics for this fold
+            # Clear fold history for this fold
             fold_hist = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
+    
+            epoch_bar = tqdm(range(num_epochs), desc=f"Fold {fold + 1}", leave=False)
 
-        epoch_bar = tqdm(range(num_epochs), desc=f"Fold {fold + 1}", leave=False)
+            for _epoch in epoch_bar:
+                # Training step
+                train_loss, train_acc = self._train_step(train_loader, optimizer, criterion)
 
-        fold_hist: dict[str, list[float]] = {
-            "train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []
-        }
-        global_history: dict[str, list[float]] = {
-            "train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []
-        }
+                # Validation step
+                val_loss, val_acc = self.evaluate(val_loader, criterion)
 
-        for _epoch in epoch_bar:
-            # Training step
-            train_loss, train_acc = self._train_step(train_loader, optimizer, criterion)
+                fold_hist["train_loss"].append(train_loss)
+                fold_hist["train_acc"].append(train_acc)
+                fold_hist["val_loss"].append(val_loss)
+                fold_hist["val_acc"].append(val_acc)
+                global_history["train_loss"].append(train_loss)
+                global_history["train_acc"].append(train_acc)
+                global_history["val_loss"].append(val_loss)
+                global_history["val_acc"].append(val_acc)
 
-            # Validation step
-            val_loss, val_acc = self.evaluate(val_loader, criterion)
-
-            fold_hist["train_loss"].append(train_loss)
-            fold_hist["train_acc"].append(train_acc)
-            fold_hist["val_loss"].append(val_loss)
-            fold_hist["val_acc"].append(val_acc)
-            global_history["train_loss"].append(train_loss)
-            global_history["train_acc"].append(train_acc)
-            global_history["val_loss"].append(val_loss)
-            global_history["val_acc"].append(val_acc)
-
-            epoch_bar.set_postfix(
-                train_loss=f'{train_loss:.4f}',
-                train_acc=f'{train_acc:.2f}%',
-                val_loss=f'{val_loss:.4f}',
-                val_acc=f'{val_acc:.2f}%'
-            )
+                epoch_bar.set_postfix(
+                    train_loss=f'{train_loss:.4f}',
+                    train_acc=f'{train_acc:.2f}%',
+                    val_loss=f'{val_loss:.4f}',
+                    val_acc=f'{val_acc:.2f}%'
+                )
 
             # Average metrics over epochs for this fold
             for key in history:
@@ -277,7 +280,7 @@ class HAIKU(nn.Module):
 
     def _train_step(
         self,
-        dataloader: DataLoader[BatchData],
+        dataloader: DataLoader,  # pyright: ignore[reportMissingTypeArgument]
         optimizer: torch.optim.Optimizer,
         criterion: nn.Module,
     ) -> tuple[float, float]:
@@ -306,7 +309,7 @@ class HAIKU(nn.Module):
         return avg_loss, accuracy
 
     def evaluate(
-        self, dataloader: DataLoader[BatchData], criterion: nn.Module
+        self, dataloader: DataLoader, criterion: nn.Module  # pyright: ignore[reportMissingTypeArgument]
     ) -> tuple[float, float]:
         """Evaluate model on validation/test set."""
         self.eval()

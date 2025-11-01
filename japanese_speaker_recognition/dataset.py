@@ -141,7 +141,7 @@ class JapaneseVowelsDataset:
             # Convert augmented padded arrays back to list of variable-length arrays
             # by removing padding
             train_utts_aug = []
-            for i, aug_seq in enumerate(X_aug):
+            for _i, aug_seq in enumerate(X_aug):
                 # Find the actual length (before padding was added)
                 # For simplicity, keep the full padded sequence or implement unpadding logic
                 # Here we'll transpose back to (12, T) format
