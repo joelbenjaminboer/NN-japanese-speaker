@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from typing_extensions import deprecated, override
+from typing_extensions import override
 
 
 @dataclass
@@ -136,16 +136,22 @@ class InputDirs:
 class OutputDirs:
     """Configuration for output directories."""
     processed_file_dir: Path
+    figures_dir: Path
 
     @override
     def __str__(self) -> str:
-        return f"OutputDirs:\n  Processed File: {self.processed_file_dir}"
+        return (
+            f"OutputDirs:\n"
+            f"  Processed File: {self.processed_file_dir}\n"
+            f"  Figures: {self.figures_dir}"
+        )
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "OutputDirs":
         """Create OutputDirs from dictionary."""
         return cls(
-            processed_file_dir=Path(data['PROCESSED'])
+            processed_file_dir=Path(data['PROCESSED']),
+            figures_dir=Path(data['FIGURES'])
         )
 
 

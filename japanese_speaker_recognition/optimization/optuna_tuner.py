@@ -18,15 +18,17 @@ class OptunaTuner:
         config: Config,
         n_trials: int = 50,
         study_name: str = "HAIKU_speaker_recognition",
+        device: str = "cpu",
         seed: int = 42,
     ):
-        self.x_train = x_train
-        self.y_train = y_train
-        self.config = config
-        self.n_trials = n_trials
-        self.study_name = study_name
-        self.seed = seed
+        self.x_train: Tensor = x_train
+        self.y_train: Tensor = y_train
+        self.config: Config = config
+        self.n_trials: int = n_trials
+        self.study_name: str = study_name
+        self.seed: int = seed
         self.study: Study | None = None
+        self.device: str = device
 
     @staticmethod
     def _tuning_ranges_from_config(
@@ -115,10 +117,21 @@ class OptunaTuner:
         suggested_params = self._suggest_hyperparameters_from_config_ranges(trial)
         model_config = self._create_model_config(suggested_params)
 
-        model = HAIKU._from_config(model_config)
+        model = HAIKU._from_config(model_config).to(self.device)  # pyright: ignore[reportPrivateUsage]
+
+        data_device = self.x_train.device
+        model_device = next(model.parameters()).device
+
+        if data_device != model_device:
+            print(f"Warning: Data is on {data_device}, but model is on {model_device}.")
+            self.x_train = self.x_train.to(model_device)
+            self.y_train = self.y_train.to(model_device)
+            print(f"Moved data to model device: {model_device}")
+        else:
+            print(f"Data and model on same device: {data_device}")
 
         num_epochs = self.config.model.num_epochs
-        history, avg_history = model.train_model(
+        _history, avg_history = model.train_model(
             x_train=self.x_train,
             y_train=self.y_train,
             learning_rate=suggested_params["LEARNING_RATE"],

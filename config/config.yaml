@@ -33,6 +33,7 @@ INPUT_DIRS:
 
 OUTPUT_DIRS:
   PROCESSED: "data/processed_data"
+  FIGURES: "reports/figures"
 
 #HAIKU
 MODEL:

@@ -42,9 +42,20 @@ def main():
     # -------------------------------------------
     # Load the config
     # -------------------------------------------
-    cfg = Config.from_yaml()
     heading("Config settings")
+    cfg = Config.from_yaml()
     print(cfg)
+
+    # -------------------------------------------
+    # Device Configuration
+    # -------------------------------------------
+    heading("Device Configuration")
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    if cfg.model.device != device:
+        print(f"Warning: Configured device {cfg.model.device} is not available. \
+            Using {device} instead.")
+    else:
+        print(f"Using device: {device}")
 
     # -------------------------------------------
     # Build data augmentation pipeline from YAML
@@ -71,12 +82,20 @@ def main():
     y_train = torch.tensor(y_train, dtype=torch.long)     # Shape: [B, ]    
     x_test = torch.tensor(x_test, dtype=torch.float32)
     y_test = torch.tensor(y_test, dtype=torch.long)
-    
-    print(f"Training data shape: {x_train.shape}, Training labels shape: {y_train.shape}")
-    
-    # quick summary (shapes + file outputs)
-    heading("Artifacts")
 
+    # Move tensors to device
+    x_train = x_train.to(device)
+    y_train = y_train.to(device)
+    x_test = x_test.to(device)
+    y_test = y_test.to(device)
+
+    print(f"Training data shape: {x_train.shape}, Training labels shape: {y_train.shape}")
+    print(f"Test data shape: {x_test.shape}, Test labels shape: {y_test.shape}")
+
+    # -------------------------------------------
+    # Optuna Hyperparameter Tuning
+    # -------------------------------------------
+    # TODO: save the best model as a pkl for easy retrieval.
     figures_dir = cfg.optuna.figures_dir
     study_dir = cfg.optuna.study_dir
     best_config_dir = cfg.optuna.best_config_dir
@@ -85,10 +104,6 @@ def main():
     study_dir.mkdir(parents=True, exist_ok=True)
     best_config_dir.mkdir(parents=True, exist_ok=True)
 
-    # -------------------------------------------
-    # Optuna Hyperparameter Tuning
-    # -------------------------------------------
-    # TODO: save the best model as a pkl for easy retrieval.
     if cfg.optuna.enabled:
         tuner = OptunaTuner(
             x_train=x_train,
@@ -97,6 +112,7 @@ def main():
             n_trials=cfg.optuna.n_trials,
             study_name=cfg.optuna.study_name,
             seed=cfg.seed,
+            device=device
         )
 
         _ = tuner.optimize(show_progress_bar=cfg.optuna.show_progress_bar)
@@ -123,12 +139,13 @@ def main():
     else:
         model_cfg = cfg.model
     
-    model = HAIKU.create_model(model_cfg)
+    model = HAIKU.create_model(model_cfg).to(device)
+    print(f"Model created and moved to device: {device}")
 
     batch_size = model_cfg.batch_size
 
     # Train the model
-    history, avg_history = model.train_model(
+    history, _avg_history = model.train_model(
         x_train,
         y_train,
         learning_rate = model_cfg.learning_rate,
@@ -138,10 +155,8 @@ def main():
         seed= cfg.seed
     )
 
-    figure_dir = Path("reports/figures")
-
     # plot the training history
-    plot_training_history(history, figure_dir)
+    plot_training_history(history, cfg.output_dirs.figures_dir)
 
     # Print final results
     heading("Training Complete")

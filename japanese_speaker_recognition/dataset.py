@@ -7,10 +7,9 @@ from typing import Any
 from urllib.request import urlretrieve
 
 import numpy as np
+import torch
 from sklearn.preprocessing import StandardScaler
 
-# if you keep these helpers in your project:
-# japanese_speaker_recognition.data_augmentation as data_aug
 from config.config import Config
 from japanese_speaker_recognition.data_augmentation import AugmentationPipeline
 from japanese_speaker_recognition.data_embedding import EmbeddingPipeline
@@ -45,20 +44,22 @@ class JapaneseVowelsDataset:
         embedding_dim: int = 64,
         embedding_model: str = "nomic-embed-text-v1.5",
         embedidng_precision: int = 2,
+        device: str = "cpu",
         key: str | None = None,
     ) -> None:
-        self.cfg = cfg
-        self.augmenter = augmenter
+        self.cfg: Config = cfg
+        self.augmenter: AugmentationPipeline | None = augmenter
         if key is None:
-            self.key = "default"
+            self.key: str = "default"
         else:
             self.key = key
 
+        self.device: str = device
+
         # ---- Embedding config ----
-        self.embedding_dim = embedding_dim
-        self.embedding_model = embedding_model
-        self.embedding_precision = embedidng_precision
-        
+        self.embedding_dim: int = embedding_dim
+        self.embedding_model: str = embedding_model
+        self.embedding_precision: int = embedidng_precision
 
         # ---- Parse config ----
         data_url = cfg.data_url.rstrip("/") + "/"
@@ -85,6 +86,32 @@ class JapaneseVowelsDataset:
         self.test_npz: Path = self.paths.out_dir / f"test_{self.key}_data.npz"
 
         self.scaler: StandardScaler | None = None  # fitted on train
+
+    def _move_to_device(self, *arrays: np.ndarray | None) -> tuple:
+        """
+        Move numpy arrays to the specified device as tensors.
+        
+        Args:
+            *arrays: Variable number of numpy arrays or None
+            
+        Returns:
+            tuple: Tensors on the specified device (or None for None inputs)
+        """
+        
+        result: list[np.ndarray | torch.Tensor | None] = []
+        for arr in arrays:
+            if arr is None:
+                result.append(None)
+            elif isinstance(arr, torch.Tensor):
+                result.append(arr.to(self.device))
+            else:
+                tensor = torch.tensor(
+                    arr, 
+                    dtype=torch.float32 if arr.dtype != np.int64 else torch.long
+                )
+                result.append(tensor.to(self.device))
+        
+        return tuple(result) if len(result) > 1 else result[0]  # pyright: ignore[reportReturnType, reportUnknownVariableType]
 
     # --------------------------
     # Public API
@@ -175,16 +202,16 @@ class JapaneseVowelsDataset:
                 dimension=self.embedding_dim,
                 precision=self.embedding_precision,
             )
-            
+
             X_train = train_embedder.get_fused
             X_test = test_embedder.get_fused
-            
+
             y_train = self._generate_train_labels()
             y_test = self._generate_test_labels()
-            
+
             np.savez_compressed(self.train_npz, X_train=X_train, y_train=y_train)
             np.savez_compressed(self.test_npz, X_test=X_test, y_test=y_test)
-            
+
             out = {
             "X_train": X_train,
             "y_train": y_train,
