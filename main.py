@@ -144,6 +144,17 @@ def main():
 
     batch_size = model_cfg.batch_size
 
+    device = torch.device(model.device if isinstance(model.device, str) else model.device)
+
+    if device.type == 'cuda' and x_train.is_cuda:
+        num_workers = 0
+        pin_memory = False
+        print(f"Training with GPU tensors - using num_workers=0, pin_memory=False")
+    else:
+        num_workers = cfg.model.num_workers
+        pin_memory = cfg.model.pin_memory
+        print(f"Training with CPU tensors - using num_workers={num_workers}, pin_memory={pin_memory}")
+
     # Train the model
     history, _avg_history = model.train_model(
         x_train,
@@ -152,6 +163,8 @@ def main():
         num_epochs = model_cfg.num_epochs,
         batch_size = batch_size,
         k_folds= model_cfg.k_folds,
+        num_workers= num_workers,
+        pin_memory= pin_memory,
         seed= cfg.seed
     )
 

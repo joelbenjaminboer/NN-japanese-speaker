@@ -206,7 +206,7 @@ class JapaneseVowelsDataset:
             X_train = train_embedder.get_fused
             X_test = test_embedder.get_fused
 
-            y_train = self._generate_train_labels()
+            # y_train = self._generate_train_labels()
             y_test = self._generate_test_labels()
 
             np.savez_compressed(self.train_npz, X_train=X_train, y_train=y_train)

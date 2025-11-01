@@ -1,4 +1,4 @@
-from typing import Self, TypeAlias
+from typing import Self
 
 import torch
 import torch.nn as nn
@@ -17,7 +17,7 @@ from config.config import Model
 from utils.utils import heading
 
 # BatchData: TypeAlias = tuple[torch.Tensor, torch.Tensor]
-TrainDataset: TypeAlias = TensorDataset | Subset[TensorDataset]
+# TrainDataset: TypeAlias = TensorDataset | Subset[TensorDataset]
 
 class HAIKU(nn.Module):
     """
@@ -196,6 +196,8 @@ class HAIKU(nn.Module):
         num_epochs: int = 10,
         batch_size: int = 32,
         k_folds: int = 5,
+        num_workers: int = 4,
+        pin_memory: bool = True,
         seed: int = 42
     ) -> tuple[dict[str, list[float]], dict[str, float]]:
         """Train the model using K-Fold cross-validation and return averaged training history."""
@@ -209,36 +211,45 @@ class HAIKU(nn.Module):
         full_dataset = TensorDataset(x_train, y_train)
         kf: KFold = KFold(n_splits=k_folds, shuffle=True, random_state=seed)
 
-        history: dict[str, list[float]] = {
+        # Track per-fold averaged metrics
+        fold_averaged_history: dict[str, list[float]] = {
             "train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []
         }
-        fold_hist: dict[str, list[float]] = {
-            "train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []
-        }
+        
+        # Track all epoch metrics across all folds
         global_history: dict[str, list[float]] = {
             "train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []
         }
-        fold: int = 0
 
         # Loop through folds
         for fold, (train_idx, val_idx) in enumerate(kf.split(x_train)):
             print(f"\n{'='*20} Fold {fold + 1}/{k_folds} {'='*20}")
-            # global_history = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
+            
             # Split dataset
             train_subset = Subset(full_dataset, train_idx)
             val_subset = Subset(full_dataset, val_idx)
 
-            train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
+            train_loader = DataLoader(
+                train_subset, 
+                batch_size=batch_size, 
+                shuffle=True,
+                num_workers=num_workers,
+                pin_memory=pin_memory,
+                persistent_workers=True if num_workers > 0 else False,
+            )
+            
             val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
 
             # Reinitialize model weights before each fold
-            _ = self.apply(self._init_weights)
+            self = self.apply(self._init_weights)
 
             optimizer = torch.optim.RAdam(self.parameters(), lr=learning_rate)
             criterion = nn.CrossEntropyLoss()
 
-            # Clear fold history for this fold
-            fold_hist = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
+            # Track metrics for THIS fold only
+            fold_history: dict[str, list[float]] = {
+                "train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []
+            }
     
             epoch_bar = tqdm(range(num_epochs), desc=f"Fold {fold + 1}", leave=False)
 
@@ -249,10 +260,13 @@ class HAIKU(nn.Module):
                 # Validation step
                 val_loss, val_acc = self.evaluate(val_loader, criterion)
 
-                fold_hist["train_loss"].append(train_loss)
-                fold_hist["train_acc"].append(train_acc)
-                fold_hist["val_loss"].append(val_loss)
-                fold_hist["val_acc"].append(val_acc)
+                # Store in fold history
+                fold_history["train_loss"].append(train_loss)
+                fold_history["train_acc"].append(train_acc)
+                fold_history["val_loss"].append(val_loss)
+                fold_history["val_acc"].append(val_acc)
+                
+                # Store in global history
                 global_history["train_loss"].append(train_loss)
                 global_history["train_acc"].append(train_acc)
                 global_history["val_loss"].append(val_loss)
@@ -265,16 +279,28 @@ class HAIKU(nn.Module):
                     val_acc=f'{val_acc:.2f}%'
                 )
 
-            # Average metrics over epochs for this fold
-            for key in history:
-                history[key].append(sum(fold_hist[key]) / len(fold_hist[key]))
+            # Average metrics over epochs for this fold and store
+            for key in fold_averaged_history:
+                fold_avg = sum(fold_history[key]) / len(fold_history[key])
+                fold_averaged_history[key].append(fold_avg)
+            
+            # Print fold summary
+            print(f"\nFold {fold + 1} Summary:")
+            print(f"  Avg Train Loss: {fold_averaged_history['train_loss'][-1]:.4f}")
+            print(f"  Avg Train Acc:  {fold_averaged_history['train_acc'][-1]:.2f}%")
+            print(f"  Avg Val Loss:   {fold_averaged_history['val_loss'][-1]:.4f}")
+            print(f"  Avg Val Acc:    {fold_averaged_history['val_acc'][-1]:.2f}%")
 
-        # Average results over folds
-        averaged_history = {k: sum(v) / len(v) for k, v in history.items()}
+        # Average results across all folds
+        averaged_history = {
+            k: sum(v) / len(v) for k, v in fold_averaged_history.items()
+        }
 
         print("\n===== Cross-validation results =====")
-        print(f"Avg Train Acc: {averaged_history['train_acc']:.2f}%")
-        print(f"Avg Val Acc:   {averaged_history['val_acc']:.2f}%")
+        print(f"Avg Train Loss: {averaged_history['train_loss']:.4f} \t Max Val Acc: {max(fold_averaged_history['val_acc']):.2f}%")
+        print(f"Avg Train Acc:  {averaged_history['train_acc']:.2f}% \t Min Val Loss: {min(fold_averaged_history['val_loss']):.4f}")
+        print(f"Avg Val Loss:   {averaged_history['val_loss']:.4f}   \t Min Val Loss: {min(fold_averaged_history['val_loss']):.4f}")
+        print(f"Avg Val Acc:    {averaged_history['val_acc']:.2f}%   \t Max Val Acc: {max(fold_averaged_history['val_acc']):.2f}%")
 
         return global_history, averaged_history
 

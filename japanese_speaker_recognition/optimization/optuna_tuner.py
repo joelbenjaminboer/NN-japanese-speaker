@@ -110,6 +110,8 @@ class OptunaTuner:
             batch_size=int(suggested_params.get("BATCH_SIZE", 32)),
             num_epochs=model_config.num_epochs,
             k_folds=model_config.k_folds,
+            num_workers=model_config.num_workers,
+            pin_memory=model_config.pin_memory,
             device=model_config.device
         )
 
@@ -122,13 +124,14 @@ class OptunaTuner:
         data_device = self.x_train.device
         model_device = next(model.parameters()).device
 
-        if data_device != model_device:
-            print(f"Warning: Data is on {data_device}, but model is on {model_device}.")
-            self.x_train = self.x_train.to(model_device)
-            self.y_train = self.y_train.to(model_device)
-            print(f"Moved data to model device: {model_device}")
+        if model_device.type == 'cuda':
+            num_workers = 0
+            use_pin_memory = False
+            print(f"Data on GPU - using num_workers=0, pin_memory=False")
         else:
-            print(f"Data and model on same device: {data_device}")
+            num_workers = self.config.model.num_workers
+            use_pin_memory = model_config.pin_memory
+            print(f"Data on CPU - using num_workers={num_workers}, pin_memory={use_pin_memory}")
 
         num_epochs = self.config.model.num_epochs
         _history, avg_history = model.train_model(
@@ -138,6 +141,8 @@ class OptunaTuner:
             num_epochs=num_epochs,
             batch_size=int(suggested_params["BATCH_SIZE"]),
             k_folds=self.config.model.k_folds,
+            num_workers=num_workers,
+            pin_memory=use_pin_memory,
             seed=self.seed,
         )
 

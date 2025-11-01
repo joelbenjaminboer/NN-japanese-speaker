@@ -1,12 +1,16 @@
 from pathlib import Path
-from japanese_speaker_recognition.optimization.optuna_tuner import OptunaTuner  # adapt path if needed
+
 import torch
-from japanese_speaker_recognition.dataset import JapaneseVowelsDataset
-from japanese_speaker_recognition.data_augmentation import AugmentationPipeline
 import yaml
 
+from japanese_speaker_recognition.data_augmentation import AugmentationPipeline
+from japanese_speaker_recognition.dataset import JapaneseVowelsDataset
+from japanese_speaker_recognition.optimization.optuna_tuner import (
+    OptunaTuner,  # adapt path if needed
+)
+
 # --- Load data and config ---
-with open("config.yaml", "r") as f:
+with open("config.yaml") as f:
     cfg = yaml.safe_load(f)
 
 aug_cfg = cfg.get("AUGMENTATION") or {}

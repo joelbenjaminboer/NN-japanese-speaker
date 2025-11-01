@@ -246,6 +246,8 @@ class Model:
     batch_size: int
     num_epochs: int
     k_folds: int
+    num_workers: int
+    pin_memory: bool
     device: Literal["cuda", "cpu", "auto"]
 
     @override
@@ -264,6 +266,8 @@ class Model:
             f"  Batch Size: {self.batch_size}\n"
             f"  Num Epochs: {self.num_epochs}\n"
             f"  K-Folds: {self.k_folds}\n"
+            f"  Num Workers: {self.num_workers}\n"
+            f"  Pin Memory: {self.pin_memory}\n"
             f"  Device: {self.device}"
         )
 
@@ -284,6 +288,8 @@ class Model:
             batch_size=data['BATCH_SIZE'],
             num_epochs=data['NUM_EPOCHS'],
             k_folds=data['K_FOLDS'],
+            num_workers=data['NUM_WORKERS'],
+            pin_memory=data['PIN_MEMORY'],
             device=data['DEVICE']
         )
 
