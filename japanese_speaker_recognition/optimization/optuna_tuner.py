@@ -121,7 +121,6 @@ class OptunaTuner:
 
         model = HAIKU._from_config(model_config).to(self.device)  # pyright: ignore[reportPrivateUsage]
 
-        data_device = self.x_train.device
         model_device = next(model.parameters()).device
 
         if model_device.type == 'cuda':

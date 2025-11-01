@@ -8,19 +8,19 @@ from japanese_speaker_recognition.dataset import JapaneseVowelsDataset
 from japanese_speaker_recognition.optimization.optuna_tuner import (
     OptunaTuner,  # adapt path if needed
 )
+from config.config import Config
 
 # --- Load data and config ---
-with open("config.yaml") as f:
-    cfg = yaml.safe_load(f)
+cfg = Config.from_yaml()
 
-aug_cfg = cfg.get("AUGMENTATION") or {}
-augmenter = AugmentationPipeline.from_config(aug_cfg) if aug_cfg else None
+aug_cfg = cfg.augmentation
+augmenter = AugmentationPipeline.from_config(aug_cfg)
 
-embed_cfg = cfg.get("EMBEDDING") or {}
+embed_cfg = cfg.embedding
 ds = JapaneseVowelsDataset(cfg, 
                             augmenter= augmenter,
-                            embedding_dim=embed_cfg.get("DIMENSION", 64),
-                            key=embed_cfg.get("KEY", None))
+                            embedding_dim=embed_cfg.dimension,
+                            key=embed_cfg.key)
 artifacts = ds.prepare()
 x_train = artifacts["X_train"]
 y_train = artifacts["y_train"]
