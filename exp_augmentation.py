@@ -292,7 +292,8 @@ class AugmentationExperiment:
             k_folds=self.cfg.model.k_folds,
             num_workers=self.cfg.model.num_workers if self.device == "cpu" else 0,
             pin_memory=self.cfg.model.pin_memory if self.device == "cpu" else False,
-            seed=self.cfg.seed
+            seed=self.cfg.seed,
+            trial=trial
         )
         
         # Return average validation accuracy across all folds
@@ -308,12 +309,34 @@ class AugmentationExperiment:
         n_startup_trials: Number of random trials before pruning kicks in (warmup).
         n_warmup_steps: Number of steps before pruner evaluates (wait for signal).
         interval_steps: Check every N steps (here every fold).
+        
+        Note: SQLite on NFS requires special configuration since WAL mode
+        does not work on network filesystems.
         """
         heading("Starting Augmentation + Model Optimization")
         
-        # Storage for parallel/distributed optimization
+        # Storage for parallel/distributed optimization on NFS
         if storage_url is None:
             storage_url = "sqlite:///exp_augmentation_study.db"
+        
+        # Configure storage for NFS environments
+        # WAL mode does NOT work on NFS - use rollback journal with high timeout
+        if storage_url.startswith("sqlite"):
+            storage = optuna.storages.RDBStorage(
+                url=storage_url,
+                engine_kwargs={
+                    "connect_args": {
+                        "timeout": 120.0,  # High timeout for NFS lock contention
+                        "check_same_thread": False,
+                        "isolation_level": None,  # Autocommit mode for better concurrency
+                    },
+                    "pool_pre_ping": True,  # Verify connections before using
+                    "pool_size": 1,  # Single connection per worker
+                    "max_overflow": 0,  # No overflow connections
+                },
+            )
+        else:
+            storage = storage_url
         
         # MedianPruner: stops trials performing worse than median at same step
         pruner = MedianPruner(
@@ -327,7 +350,7 @@ class AugmentationExperiment:
             study_name=self.study_name,
             sampler=TPESampler(seed=self.cfg.seed),
             pruner=pruner,
-            storage=storage_url,
+            storage=storage,  # Use configured storage
             load_if_exists=True
         )
         

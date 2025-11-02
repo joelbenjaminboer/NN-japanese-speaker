@@ -1,5 +1,6 @@
 from typing import Self
 
+import optuna
 import torch
 import torch.nn as nn
 from sklearn.model_selection import KFold
@@ -198,7 +199,8 @@ class HAIKU(nn.Module):
         k_folds: int = 5,
         num_workers: int = 4,
         pin_memory: bool = True,
-        seed: int = 42
+        seed: int = 42,
+        trial = None  # optuna.Trial for pruning support
     ) -> tuple[dict[str, list[float]], dict[str, float]]:
         """Train the model using K-Fold cross-validation and return averaged training history."""
 
@@ -290,6 +292,12 @@ class HAIKU(nn.Module):
             print(f"  Avg Train Acc:  {fold_averaged_history['train_acc'][-1]:.2f}%")
             print(f"  Avg Val Loss:   {fold_averaged_history['val_loss'][-1]:.4f}")
             print(f"  Avg Val Acc:    {fold_averaged_history['val_acc'][-1]:.2f}%")
+            
+            # Report intermediate value for pruning
+            if trial is not None:
+                trial.report(fold_averaged_history['val_acc'][-1], fold)
+                if trial.should_prune():
+                    raise optuna.TrialPruned()
 
         # Average results across all folds
         averaged_history = {

@@ -87,7 +87,9 @@ class JapaneseVowelsDataset:
         self.paths.out_dir.mkdir(parents=True, exist_ok=True)
         
         self.train_npz: Path = self.paths.out_dir / f"train_{self.key}_data.npz"
-        self.test_npz: Path = self.paths.out_dir / f"test_{self.key}_data.npz"
+        # Test set doesn't depend on augmentation, so use a fixed key
+        test_key = f"{self.embedding_model.split('/')[-1]}_{self.embedding_dim}d"
+        self.test_npz: Path = self.paths.out_dir / f"test_{test_key}_data.npz"
 
         self.scaler: StandardScaler | None = None  # fitted on train
 

@@ -172,15 +172,33 @@ class OptunaTuner:
 
         # Use shared database for parallel jobs
         if storage_url is None:
-            storage_url = "sqlite:///optuna_study.db"  # works on shared filesystem
-            # or for PostgreSQL (better for many nodes):
-            # storage_url = "postgresql://user:password@host:port/dbname"
+            storage_url = "sqlite:///optuna_study.db"
+
+        # Configure SQLite for NFS environments with high timeout
+        # Note: WAL mode does NOT work on network filesystems (NFS) due to
+        # shared memory requirements. Use default rollback journal with high timeout.
+        if storage_url.startswith("sqlite"):
+            storage = optuna.storages.RDBStorage(
+                url=storage_url,
+                engine_kwargs={
+                    "connect_args": {
+                        "timeout": 120.0,  # High timeout for NFS lock contention
+                        "check_same_thread": False,
+                        "isolation_level": None,  # Autocommit mode
+                    },
+                    "pool_pre_ping": True,  # Verify connections before using
+                    "pool_size": 1,  # Single connection per worker
+                    "max_overflow": 0,  # No overflow connections
+                },
+            )
+        else:
+            storage = storage_url
 
         self.study = optuna.create_study(
             direction=direction,
             study_name=self.study_name,
             sampler=optuna.samplers.TPESampler(seed=self.seed),
-            storage=storage_url,  # <--- NEW
+            storage=storage,  # <--- Use configured storage
             load_if_exists=True,  # <--- allows multiple workers
         )
 
