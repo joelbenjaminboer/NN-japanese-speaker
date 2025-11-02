@@ -195,6 +195,7 @@ class AugmentationExperiment:
             embedding_dim=self.cfg.embedding.dimension,
             embedding_model=self.cfg.embedding.model,
             embedidng_precision=self.cfg.embedding.pre_precision,
+            embedding_batch_size=self.cfg.embedding.batch_size,
             device=self.device,
             key=cache_key
         )

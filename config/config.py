@@ -83,6 +83,7 @@ class Embedding:
     model: str
     dimension: int
     pre_precision: int
+    batch_size: int
     output_dir: Path
     key: str
 
@@ -93,6 +94,7 @@ class Embedding:
             f"  Model: {self.model}\n"
             f"  Dimension: {self.dimension}\n"
             f"  Pre-precision: {self.pre_precision}\n"
+            f"  Batch Size: {self.batch_size}\n"
             f"  Output Dir: {self.output_dir}\n"
             f"  Key: {self.key}"
         )
@@ -104,6 +106,7 @@ class Embedding:
             model=data['MODEL'],
             dimension=data['DIMENSION'],
             pre_precision=data['PRE_PRECISION'],
+            batch_size=data['BATCH_SIZE'],
             output_dir=Path(data['OUTPUT_FILE']),
             key=data['KEY'],
         )

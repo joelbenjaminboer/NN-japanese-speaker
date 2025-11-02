@@ -12,7 +12,7 @@ from sklearn.preprocessing import StandardScaler
 
 from config.config import Config
 from japanese_speaker_recognition.data_augmentation import AugmentationPipeline
-from japanese_speaker_recognition.data_embedding import EmbeddingPipeline
+from japanese_speaker_recognition.data_embedding import BaseEmbeddingPipeline, LocalEmbeddingPipeline
 
 
 @dataclass
@@ -44,8 +44,10 @@ class JapaneseVowelsDataset:
         embedding_dim: int = 64,
         embedding_model: str = "nomic-embed-text-v1.5",
         embedidng_precision: int = 2,
+        embedding_batch_size: int = 128,
         device: str = "cpu",
         key: str | None = None,
+        embedding_pipeline_class: type[BaseEmbeddingPipeline] = LocalEmbeddingPipeline,
     ) -> None:
         self.cfg: Config = cfg
         self.augmenter: AugmentationPipeline | None = augmenter
@@ -55,11 +57,13 @@ class JapaneseVowelsDataset:
             self.key = key
 
         self.device: str = device
+        self.embedding_pipeline_class = embedding_pipeline_class
 
         # ---- Embedding config ----
         self.embedding_dim: int = embedding_dim
         self.embedding_model: str = embedding_model
         self.embedding_precision: int = embedidng_precision
+        self.embedding_batch_size: int = embedding_batch_size
 
         # ---- Parse config ----
         data_url = cfg.data_url.rstrip("/") + "/"
@@ -190,18 +194,27 @@ class JapaneseVowelsDataset:
         print(self.paths.out_dir)
         print("Embedding training utterances...")
         if not os.path.exists(self.train_npz):
-            train_embedder = EmbeddingPipeline(
-                timeseries=train_utts,
-                model_name=self.embedding_model,
-                dimension=self.embedding_dim,
-                precision=self.embedding_precision,
-            )
-            test_embedder = EmbeddingPipeline(
-                timeseries=test_utts,
-                model_name=self.embedding_model,
-                dimension=self.embedding_dim,
-                precision=self.embedding_precision,
-            )
+            # Build kwargs for embedding pipeline (supports both Local and API versions)
+            embedding_kwargs = {
+                "timeseries": train_utts,
+                "model_name": self.embedding_model,
+                "dimension": self.embedding_dim,
+                "precision": self.embedding_precision,
+            }
+            
+            # Add optional parameters if using LocalEmbeddingPipeline
+            if self.embedding_pipeline_class is LocalEmbeddingPipeline:
+                embedding_kwargs.update({
+                    "device": self.device,
+                    "batch_size": self.embedding_batch_size,
+                    "task_prefix": "classification",
+                })
+            
+            train_embedder = self.embedding_pipeline_class(**embedding_kwargs)
+            
+            # Same for test embedder
+            embedding_kwargs["timeseries"] = test_utts
+            test_embedder = self.embedding_pipeline_class(**embedding_kwargs)
 
             X_train = train_embedder.get_fused
             X_test = test_embedder.get_fused

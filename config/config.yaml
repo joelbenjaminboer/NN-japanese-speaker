@@ -21,9 +21,10 @@ AUGMENTATION:
     #   max_mask_percentage: 0.01
 
 EMBEDDING:
-  MODEL: "nomic-embed-text-v1.5"
+  MODEL: "nomic-ai/nomic-embed-text-v1.5"
   DIMENSION: 512
   PRE_PRECISION: 2
+  BATCH_SIZE: 256  # Batch size for embedding (higher = faster, but uses more GPU memory)
   OUTPUT_FILE: "data/processed_data/"
   KEY: "augment512"
 
