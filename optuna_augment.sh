@@ -7,7 +7,6 @@
 #SBATCH --gpus-per-node=h100_80gb_hbm3_1g.10gb:1
 #SBATCH --mem=16G
 #SBATCH --cpus-per-task=8
-#SBATCH --array=1-2  # 2 parallel workers
 
 module load Python/3.11.5-GCCcore-13.2.0
 module load CUDA/12.1.1
@@ -15,7 +14,6 @@ module load Boost/1.79.0-GCC-11.3.0
 
 source .venv/bin/activate
 
-# Each worker runs the same script - Optuna handles trial distribution via shared SQLite DB
-# The RDBStorage configuration in exp_augmentation.py handles NFS-compatible locking
-echo "Worker ${SLURM_ARRAY_TASK_ID} starting on $(hostname)"
+# Single worker configuration
+echo "Starting optimization on $(hostname)"
 python -u exp_augmentation.py

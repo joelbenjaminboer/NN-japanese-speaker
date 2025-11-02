@@ -309,30 +309,22 @@ class AugmentationExperiment:
         n_startup_trials: Number of random trials before pruning kicks in (warmup).
         n_warmup_steps: Number of steps before pruner evaluates (wait for signal).
         interval_steps: Check every N steps (here every fold).
-        
-        Note: SQLite on NFS requires special configuration since WAL mode
-        does not work on network filesystems.
         """
         heading("Starting Augmentation + Model Optimization")
         
-        # Storage for parallel/distributed optimization on NFS
+        # Single-worker SQLite configuration
         if storage_url is None:
             storage_url = "sqlite:///exp_augmentation_study.db"
         
-        # Configure storage for NFS environments
-        # WAL mode does NOT work on NFS - use rollback journal with high timeout
+        # Simplified storage configuration for single worker
         if storage_url.startswith("sqlite"):
             storage = optuna.storages.RDBStorage(
                 url=storage_url,
                 engine_kwargs={
                     "connect_args": {
-                        "timeout": 120.0,  # High timeout for NFS lock contention
+                        "timeout": 30.0,  # Standard timeout for single worker
                         "check_same_thread": False,
-                        "isolation_level": None,  # Autocommit mode for better concurrency
                     },
-                    "pool_pre_ping": True,  # Verify connections before using
-                    "pool_size": 1,  # Single connection per worker
-                    "max_overflow": 0,  # No overflow connections
                 },
             )
         else:
