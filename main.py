@@ -184,6 +184,12 @@ def main():
     avg_loss, test_acc = model.evaluate(test_loader, criterion=nn.CrossEntropyLoss())
     print(f"Test Set Accuracy: {test_acc:.2f}%")
     print(f"Test Set Loss: {avg_loss:.4f}")
+    
+    # -------------------------------------------
+    # Save the trained model
+    # -------------------------------------------
+    heading("Saving the trained model")
+    model.save_onnx(cfg.output_dirs.model_dir / "trained_model.onnx")
 
 if __name__ == "__main__":
     main()

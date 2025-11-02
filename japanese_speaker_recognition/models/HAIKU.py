@@ -358,3 +358,45 @@ class HAIKU(nn.Module):
         avg_loss = total_loss / len(dataloader)
         accuracy = 100 * correct / total
         return avg_loss, accuracy
+    
+    def save_onnx(
+        self,
+        file_path: str = "haiku_model.onnx",
+        input_shape: tuple[int, int, int] | None = None,
+        opset_version: int = 17,
+        dynamic_batch: bool = True,
+    ) -> None:
+        """
+        Export the trained model to ONNX format.
+
+        Args:
+            file_path: Output ONNX file path.
+            input_shape: Example input shape (default: (1, 12, embedding_dim)).
+            opset_version: ONNX opset version (default 17).
+            dynamic_batch: Whether to allow dynamic batch sizes.
+        """
+        self.eval()  # Switch to eval mode
+        input_shape = input_shape or (1, 12, self.embedding_dim)
+
+        # Create dummy input tensor
+        dummy_input = torch.randn(*input_shape, device=self.device)
+
+        # Dynamic axes allows variable batch sizes at inference
+        dynamic_axes = {"input": {0: "batch_size"}, "output": {0: "batch_size"}} if dynamic_batch else None
+
+        print(f"Exporting HAIKU to ONNX → {file_path}")
+        print(f"Input shape: {tuple(dummy_input.shape)} | Opset: {opset_version}")
+
+        torch.onnx.export(
+            self,
+            dummy_input,
+            file_path,
+            export_params=True,
+            opset_version=opset_version,
+            do_constant_folding=True,
+            input_names=["input"],
+            output_names=["output"],
+            dynamic_axes=dynamic_axes,
+        )
+
+        print(f"Model successfully exported to {file_path}")

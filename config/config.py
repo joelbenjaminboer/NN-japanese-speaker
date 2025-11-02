@@ -137,6 +137,7 @@ class OutputDirs:
     """Configuration for output directories."""
     processed_file_dir: Path
     figures_dir: Path
+    model_dir: Path
 
     @override
     def __str__(self) -> str:
@@ -144,6 +145,7 @@ class OutputDirs:
             f"OutputDirs:\n"
             f"  Processed File: {self.processed_file_dir}\n"
             f"  Figures: {self.figures_dir}"
+            f"  Model Dir: {self.model_dir}"
         )
 
     @classmethod
@@ -151,7 +153,8 @@ class OutputDirs:
         """Create OutputDirs from dictionary."""
         return cls(
             processed_file_dir=Path(data['PROCESSED']),
-            figures_dir=Path(data['FIGURES'])
+            figures_dir=Path(data['FIGURES']),
+            model_dir=Path(data['MODELS'])
         )
 
 

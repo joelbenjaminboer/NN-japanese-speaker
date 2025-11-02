@@ -34,6 +34,7 @@ INPUT_DIRS:
 OUTPUT_DIRS:
   PROCESSED: "data/processed_data"
   FIGURES: "reports/figures"
+  MODELS: "models"
 
 #HAIKU
 MODEL:
@@ -54,7 +55,7 @@ MODEL:
   DEVICE: "cuda"  # Options: "cuda", "cpu", "auto"
 
 OPTUNA:
-  ENABLED: true
+  ENABLED: false
   SHOW_PROGRESS_BAR: true
   N_TRIALS: 10
   STUDY_NAME: "HAIKU_speaker_recognition_v4"
