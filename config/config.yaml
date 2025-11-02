@@ -1,17 +1,12 @@
 DATA_URL: "https://archive.ics.uci.edu/ml/machine-learning-databases/JapaneseVowels/"
 
 SEED: 42
-
-PIPELINE: # Change these for the pipeline
-  TRAIN: True
-  TEST: False
-
 MAX_LEN: 29  # longest utterance length (7–29)
 N_FEATURES: 12
 
 AUGMENTATION:
   AUGMENT: false
-  REPEATS: 100
+  REPEATS: 2
   AUG_FILE: "data/augmented_data.npz"
   SEED: 42
   STEPS:
@@ -27,9 +22,10 @@ AUGMENTATION:
 
 EMBEDDING:
   MODEL: "nomic-embed-text-v1.5"
-  DIMENSION: 64
+  DIMENSION: 512
   PRE_PRECISION: 2
   OUTPUT_FILE: "data/processed_data/"
+  KEY: "augment512"
 
 INPUT_DIRS:
   TRAIN_FILE: "data/ae.train"
@@ -37,34 +33,39 @@ INPUT_DIRS:
 
 OUTPUT_DIRS:
   PROCESSED: "data/processed_data"
+  FIGURES: "reports/figures"
+  MODELS: "models"
 
 #HAIKU
 MODEL:
-  LOAD_BEST_CONFIG: true # Whether to load the best config from Optuna. Only works if OPTUNA.ENABLED is true
+  LOAD_BEST_CONFIG: false # Whether to load the best config from Optuna. Only works if OPTUNA.ENABLED is true
   NUM_CLASSES: 9
-  EMBEDDING_DIM: 64
+  EMBEDDING_DIM: 512 # this is duplicated ^ EMBEDDING.DIMENSION = 512
   KERNEL_SIZE: 3
   CONV_CHANNELS: 128
   DROPOUT: 0.3
   INPUT_CHANNELS: 12
   HIDDEN_DIM: 64
   LEARNING_RATE: 0.007
-  BATCH_SIZE: 32
-  NUM_EPOCHS: 10
-  K_FOLDS: 2
-  DEVICE: "auto"  # Options: "cuda", "cpu", "auto"
+  BATCH_SIZE: 256
+  NUM_EPOCHS: 1000
+  K_FOLDS: 5
+  NUM_WORKERS: 4
+  PIN_MEMORY: true
+  DEVICE: "cuda"  # Options: "cuda", "cpu", "auto"
 
 OPTUNA:
   ENABLED: false
-  N_TRIALS: 50
-  STUDY_NAME: "HAIKU_speaker_recognition"
+  SHOW_PROGRESS_BAR: true
+  N_TRIALS: 10
+  STUDY_NAME: "HAIKU_speaker_recognition_v4"
   FIGURES_DIR: "reports/optuna/figures"
   STUDY_DIR: "reports/optuna/study"
   BEST_CONFIG_DIR: "reports/optuna/best_config"
   RANGES:
     LEARNING_RATE: [1e-5, 1e-2] # low, high
     DROPOUT: [0.1, 0.5] # low, high
-    CONV_CHANNELS: [64, 128, 256]
-    HIDDEN_DIM: [32, 64, 128]
-    KERNEL_SIZE: [3, 5, 7]
-    BATCH_SIZE: [16, 32, 64]
+    CONV_CHANNELS: [128, 256, 512]
+    HIDDEN_DIM: [16, 32, 64, 128]
+    KERNEL_SIZE: [3, 5, 7, 9]
+    BATCH_SIZE: [1024, 2048]

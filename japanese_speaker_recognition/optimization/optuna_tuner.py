@@ -1,11 +1,11 @@
 from pathlib import Path
-from typing import Any, Literal
+from typing import Literal
 
 import optuna
 from optuna import Study, Trial
 from torch import Tensor
-import numpy as np
 
+from config.config import Config, Model, OptunaRanges
 from japanese_speaker_recognition.models.HAIKU import HAIKU
 from utils.utils import heading
 
@@ -15,34 +15,38 @@ class OptunaTuner:
         self,
         x_train: Tensor,
         y_train: Tensor,
-        base_config: dict[str, Any],
+        config: Config,
         n_trials: int = 50,
         study_name: str = "HAIKU_speaker_recognition",
+        device: str = "cpu",
         seed: int = 42,
     ):
-        self.x_train = x_train
-        self.y_train = y_train
-        self.base_config = base_config
-        self.n_trials = n_trials
-        self.study_name = study_name
-        self.seed = seed
+        self.x_train: Tensor = x_train
+        self.y_train: Tensor = y_train
+        self.config: Config = config
+        self.n_trials: int = n_trials
+        self.study_name: str = study_name
+        self.seed: int = seed
         self.study: Study | None = None
+        self.device: str = device
 
     @staticmethod
     def _tuning_ranges_from_config(
-        config: dict[str, Any]
+        optuna_ranges: OptunaRanges
         ) -> dict[str, tuple[float, float] | list[int]]:
         """requires only the ranges part of the yaml config"""
-        learning_rate_raw = list[float](config.get("LEARNING_RATE", [1e-5, 1e-2]))
-        dropout_raw = list[float](config.get("DROPOUT", [0.1, 0.5]))
-        conv_channels = list[int](config.get("CONV_CHANNELS", [64, 128, 256]))
-        hidden_dim = list[int](config.get("HIDDEN_DIM", [32, 64, 128]))
-        kernel_size = list[int](config.get("KERNEL_SIZE", [3, 5, 7]))
-        batch_size = list[int](config.get("BATCH_SIZE", [16, 32, 64]))
+        learning_rate_raw: list[float] = optuna_ranges.learning_rate
+        dropout_raw: list[float] = optuna_ranges.dropout
+        conv_channels: list[int] = optuna_ranges.conv_channels
+        hidden_dim: list[int] = optuna_ranges.hidden_dim
+        kernel_size: list[int] = optuna_ranges.kernel_size
+        batch_size: list[int] = optuna_ranges.batch_size
 
         # Convert 2-element lists to tuples for ranges
-        learning_rate = (float(learning_rate_raw[0]), float(learning_rate_raw[1]))
-        dropout = (float(dropout_raw[0]), float(dropout_raw[1]))
+        learning_rate: tuple[float, float] = (
+            float(learning_rate_raw[0]), float(learning_rate_raw[1])
+            )
+        dropout: tuple[float, float] = (float(dropout_raw[0]), float(dropout_raw[1]))
 
         return {
             "LEARNING_RATE": learning_rate,
@@ -53,16 +57,17 @@ class OptunaTuner:
             "BATCH_SIZE": batch_size,
         }
 
+
     def _suggest_hyperparameters_from_config_ranges(self, trial: Trial) -> dict[str, int | float]:
         """Takes self.base_config and suggests hyperparameters."""
-        param_ranges_config = self.base_config.get("OPTUNA", {}).get("RANGES", {})
+        param_ranges_config: OptunaRanges = self.config.optuna.ranges
         suggested_params = self._tuning_ranges_from_config(param_ranges_config)
 
-        learning_rate_low = suggested_params["LEARNING_RATE"][0]
-        learning_rate_high = suggested_params["LEARNING_RATE"][1]
+        learning_rate_low: float = suggested_params["LEARNING_RATE"][0]
+        learning_rate_high: float = suggested_params["LEARNING_RATE"][1]
 
-        dropout_low = float(suggested_params["DROPOUT"][0])
-        dropout_high = float(suggested_params["DROPOUT"][1])
+        dropout_low: float = suggested_params["DROPOUT"][0]
+        dropout_high: float = suggested_params["DROPOUT"][1]
 
         return {
             "LEARNING_RATE": trial.suggest_float(
@@ -88,35 +93,55 @@ class OptunaTuner:
     def _create_model_config(
         self,
         suggested_params: dict[str, int | float]
-        ) -> dict[str, int | float | str]:
+        ) -> Model:
         """Creates the model config from the suggested hyperparameters."""
-        model_config = self.base_config.get("MODEL", {})
+        model_config: Model = self.config.model
 
-        return {
-            "DROPOUT": suggested_params.get("DROPOUT", 0.3),
-            "EMBEDDING_DIM": model_config.get("embedding_dim", 64),
-            "KERNEL_SIZE": suggested_params.get("KERNEL_SIZE", 5),
-            "CONV_CHANNELS": suggested_params.get("CONV_CHANNELS", 128),
-            "HIDDEN_DIM": suggested_params.get("HIDDEN_DIM", 64),
-            "INPUT_CHANNELS": model_config.get("INPUT_CHANNELS", 12),
-            "NUM_CLASSES": model_config.get("NUM_CLASSES", 9),
-            "DEVICE": model_config.get("DEVICE", "cpu"),
-        }
+        return Model(
+            load_best_config=model_config.load_best_config,
+            num_classes=model_config.num_classes,
+            embedding_dim=model_config.embedding_dim,
+            kernel_size=int(suggested_params.get("KERNEL_SIZE", 3)),
+            conv_channels=int(suggested_params.get("CONV_CHANNELS", 32)),
+            dropout=float(suggested_params.get("DROPOUT", 0.1)),
+            input_channels=model_config.input_channels,
+            hidden_dim=int(suggested_params.get("HIDDEN_DIM", 64)),
+            learning_rate=float(suggested_params.get("LEARNING_RATE", 1e-4)),
+            batch_size=int(suggested_params.get("BATCH_SIZE", 32)),
+            num_epochs=model_config.num_epochs,
+            k_folds=model_config.k_folds,
+            num_workers=model_config.num_workers,
+            pin_memory=model_config.pin_memory,
+            device=model_config.device
+        )
 
     def objective(self, trial: Trial) -> float:
         suggested_params = self._suggest_hyperparameters_from_config_ranges(trial)
         model_config = self._create_model_config(suggested_params)
 
-        model = HAIKU._from_config(model_config)
+        model = HAIKU._from_config(model_config).to(self.device)  # pyright: ignore[reportPrivateUsage]
 
-        num_epochs = self.base_config.get("MODEL", {}).get("NUM_EPOCHS", 10)
-        history, avg_history = model.train_model(
+        model_device = next(model.parameters()).device
+
+        if model_device.type == 'cuda':
+            num_workers = 0
+            use_pin_memory = False
+            print(f"Data on GPU - using num_workers=0, pin_memory=False")
+        else:
+            num_workers = self.config.model.num_workers
+            use_pin_memory = model_config.pin_memory
+            print(f"Data on CPU - using num_workers={num_workers}, pin_memory={use_pin_memory}")
+
+        num_epochs = self.config.model.num_epochs
+        _history, avg_history = model.train_model(
             x_train=self.x_train,
             y_train=self.y_train,
             learning_rate=suggested_params["LEARNING_RATE"],
             num_epochs=num_epochs,
-            batch_size=suggested_params["BATCH_SIZE"],
-            k_folds=self.base_config.get("MODEL", {}).get("K_FOLDS", 5),
+            batch_size=int(suggested_params["BATCH_SIZE"]),
+            k_folds=self.config.model.k_folds,
+            num_workers=num_workers,
+            pin_memory=use_pin_memory,
             seed=self.seed,
         )
 
@@ -141,42 +166,55 @@ class OptunaTuner:
         self,
         direction: Literal["minimize", "maximize"] = "maximize",
         show_progress_bar: bool = True,
-        ) -> Study:
+        storage_url: str | None = None,   # <--- NEW
+    ) -> Study:
         heading("Starting Hyperparameter Optimization")
+
+        # Use shared database for parallel jobs
+        if storage_url is None:
+            storage_url = "sqlite:///optuna_study.db"  # works on shared filesystem
+            # or for PostgreSQL (better for many nodes):
+            # storage_url = "postgresql://user:password@host:port/dbname"
 
         self.study = optuna.create_study(
             direction=direction,
             study_name=self.study_name,
             sampler=optuna.samplers.TPESampler(seed=self.seed),
+            storage=storage_url,  # <--- NEW
+            load_if_exists=True,  # <--- allows multiple workers
         )
 
         self.study.optimize(
             self.objective,
             n_trials=self.n_trials,
-            # show_progress_bar=show_progress_bar,
+            show_progress_bar=show_progress_bar,
+            n_jobs=1,  # Optuna parallelism handled at the SLURM job level
         )
 
         self._print_results()
         return self.study
+
 
     def get_best_config(self) -> dict[str, int | float | str]:
         if self.study is None:
             raise ValueError("Must run optimize() first.")
         
         best_params = self.study.best_params
-        model_section = self.base_config.get("MODEL", {})
+        model_section = self.config.model
         return {
             "DROPOUT": best_params["DROPOUT"],
-            "EMBEDDING_DIM": model_section["EMBEDDING_DIM"],
+            "EMBEDDING_DIM": model_section.embedding_dim,
             "KERNEL_SIZE": best_params["KERNEL_SIZE"],
             "CONV_CHANNELS": best_params["CONV_CHANNELS"],
             "HIDDEN_DIM": best_params["HIDDEN_DIM"],
-            "INPUT_CHANNELS": model_section.get("INPUT_CHANNELS", 12),
-            "NUM_CLASSES": model_section.get("NUM_CLASSES", 9),
-            "DEVICE": model_section.get("DEVICE", "cpu"),
+            "INPUT_CHANNELS": model_section.input_channels,
+            "NUM_CLASSES": model_section.num_classes,
+            "DEVICE": model_section.device,
             "LEARNING_RATE": best_params["LEARNING_RATE"],
             "BATCH_SIZE": best_params["BATCH_SIZE"],
-            "NUM_EPOCHS": model_section.get("NUM_EPOCHS", 100),
+            "NUM_EPOCHS": model_section.num_epochs,
+            "LOAD_BEST_CONFIG": model_section.load_best_config,
+            "K_FOLDS": model_section.k_folds,
         }
 
     def save_plots(self, output_dir: str | Path = ".") -> None:
@@ -189,27 +227,30 @@ class OptunaTuner:
 
         try:
             import matplotlib.pyplot as plt
-            import numpy as np
             from optuna.visualization.matplotlib import (
                 plot_optimization_history,
-                plot_param_importances,
                 plot_parallel_coordinate,
+                plot_param_importances,
             )
 
             # Optimization history
-            fig = plot_optimization_history(self.study)
+            _ = plot_optimization_history(self.study)
             plt.tight_layout()
-            plt.savefig(output_dir / "optuna_optimization_history.png", dpi=300, bbox_inches='tight')
+            plt.savefig(
+                output_dir / "optuna_optimization_history.png", 
+                dpi=300, 
+                bbox_inches='tight'
+                )
             plt.close()
 
             # Parameter importances
-            fig = plot_param_importances(self.study)
+            _ = plot_param_importances(self.study)
             plt.tight_layout()
             plt.savefig(output_dir / "optuna_param_importances.png", dpi=300, bbox_inches='tight')
             plt.close()
 
             # Parallel coordinate plot
-            fig = plot_parallel_coordinate(self.study)
+            _ = plot_parallel_coordinate(self.study)
             plt.tight_layout()
             plt.savefig(output_dir / "optuna_parallel_coordinate.png", dpi=300, bbox_inches='tight')
             plt.close()

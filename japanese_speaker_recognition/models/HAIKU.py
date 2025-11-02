@@ -3,17 +3,21 @@ from typing import Self
 import torch
 import torch.nn as nn
 from sklearn.model_selection import KFold
-from torch import Tensor
+
+# from sklearn.model_selection._split import KFold
 from torch.nn.modules.container import Sequential
 from torch.nn.modules.pooling import AdaptiveAvgPool1d
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import DataLoader, Subset, TensorDataset
+
+# from torch.utils.data.dataloader import DataLoader
 from tqdm import tqdm
 from typing_extensions import override
-from torch.utils.data import random_split
-from torch.utils.data import Subset
 
+from config.config import Model
 from utils.utils import heading
 
+# BatchData: TypeAlias = tuple[torch.Tensor, torch.Tensor]
+# TrainDataset: TypeAlias = TensorDataset | Subset[TensorDataset]
 
 class HAIKU(nn.Module):
     """
@@ -49,7 +53,7 @@ class HAIKU(nn.Module):
     ):
         super().__init__()
         self.embedding_dim: int = embedding_dim
-        self.device = self._get_device(device)
+        self.device: str = self._get_device(device)
 
         # Single convolutional layer
         padding = kernel_size // 2
@@ -104,7 +108,7 @@ class HAIKU(nn.Module):
         return x.squeeze(-1)  # [B, 128]
 
     @classmethod
-    def _from_config(cls, config: dict[str, int | float | str]) -> Self:
+    def _from_config(cls, model_cfg: Model) -> Self:
         """
         Create SpeakerCNN from configuration dictionary.
         Args:
@@ -113,12 +117,12 @@ class HAIKU(nn.Module):
             SpeakerCNN instance
         """
         return cls(
-            dropout=float(config.get("DROPOUT", 0.3)),
-            embedding_dim=int(config.get("EMBEDDING_DIM", 64)),
-            kernel_size=int(config.get("KERNEL_SIZE", 5)),
-            conv_channels=int(config.get("CONV_CHANNELS", 128)),
-            hidden_dim=int(config.get("HIDDEN_DIM", 64)),
-            device=str(config.get("DEVICE", "cpu")),
+            dropout=model_cfg.dropout,
+            embedding_dim=model_cfg.embedding_dim,
+            kernel_size=model_cfg.kernel_size,
+            conv_channels=model_cfg.conv_channels,
+            hidden_dim=model_cfg.hidden_dim,
+            device=model_cfg.device,
         )
     
     @staticmethod
@@ -153,8 +157,9 @@ class HAIKU(nn.Module):
             print("Using CPU")
 
         return device
-    
-    def _init_weights(self, m):
+
+    @staticmethod
+    def _init_weights(m):
         if isinstance(m, (nn.Linear, nn.Conv1d, nn.Conv2d)):
             nn.init.xavier_uniform_(m.weight)
             if m.bias is not None:
@@ -162,7 +167,7 @@ class HAIKU(nn.Module):
 
 
     @classmethod
-    def create_model(cls, model_cfg: dict[str, int | float | str]) -> Self:
+    def create_model(cls, model_cfg: Model) -> Self:
         """Create HAIKU model from configuration."""
         model = cls._from_config(model_cfg)
 
@@ -171,13 +176,13 @@ class HAIKU(nn.Module):
 
         print("Model created:")
         print(
-            f"  - Input: [Batch, {model_cfg.get('INPUT_CHANNELS', 12)}, \
-            {model_cfg.get('EMBEDDING_DIM', 64)}]"
+            f"  - Input: [Batch, {model_cfg.input_channels}, \
+            {model_cfg.embedding_dim}]"
         )
-        print(f"  - Conv channels: {model_cfg.get('CONV_CHANNELS', 128)}")
-        print(f"  - Kernel size: {model_cfg.get('KERNEL_SIZE', 3)}")
-        print(f"  - Hidden dim: {model_cfg.get('HIDDEN_DIM', 64)}")
-        print(f"  - Output: [Batch, {model_cfg.get('NUM_CLASSES', 9)}]")
+        print(f"  - Conv channels: {model_cfg.conv_channels}")
+        print(f"  - Kernel size: {model_cfg.kernel_size}")
+        print(f"  - Hidden dim: {model_cfg.hidden_dim}")
+        print(f"  - Output: [Batch, {model_cfg.num_classes}]")
         print(f"  - Total parameters: {total_params:,}")
         print(f"  - Trainable parameters: {trainable_params:,}")
 
@@ -191,52 +196,77 @@ class HAIKU(nn.Module):
         num_epochs: int = 10,
         batch_size: int = 32,
         k_folds: int = 5,
+        num_workers: int = 4,
+        pin_memory: bool = True,
         seed: int = 42
-    ) -> dict:
+    ) -> tuple[dict[str, list[float]], dict[str, float]]:
         """Train the model using K-Fold cross-validation and return averaged training history."""
 
         torch.manual_seed(seed)
         self.to(self.device)
 
-        heading(f"Training for {num_epochs} epochs with {k_folds}-Fold cross-validation "
-                f"(lr={learning_rate}, device={self.device})")
+        heading(f"Training for {num_epochs} epochs with {k_folds}-Fold cross-validation \
+            (lr={learning_rate}, device={self.device})")
 
         full_dataset = TensorDataset(x_train, y_train)
-        kf = KFold(n_splits=k_folds, shuffle=True, random_state=seed)
+        kf: KFold = KFold(n_splits=k_folds, shuffle=True, random_state=seed)
 
-        # Store averaged metrics across folds
-        history = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
+        # Track per-fold averaged metrics
+        fold_averaged_history: dict[str, list[float]] = {
+            "train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []
+        }
+        
+        # Track all epoch metrics across all folds
+        global_history: dict[str, list[float]] = {
+            "train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []
+        }
 
         # Loop through folds
         for fold, (train_idx, val_idx) in enumerate(kf.split(x_train)):
             print(f"\n{'='*20} Fold {fold + 1}/{k_folds} {'='*20}")
-            global_history = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
+            
             # Split dataset
             train_subset = Subset(full_dataset, train_idx)
             val_subset = Subset(full_dataset, val_idx)
 
-            train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
+            train_loader = DataLoader(
+                train_subset, 
+                batch_size=batch_size, 
+                shuffle=True,
+                num_workers=num_workers,
+                pin_memory=pin_memory,
+                persistent_workers=True if num_workers > 0 else False,
+            )
+            
             val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
 
             # Reinitialize model weights before each fold
-            self.apply(self._init_weights)
+            self = self.apply(self._init_weights)
 
             optimizer = torch.optim.RAdam(self.parameters(), lr=learning_rate)
             criterion = nn.CrossEntropyLoss()
 
-            # Track metrics for this fold
-            fold_hist = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
-
+            # Track metrics for THIS fold only
+            fold_history: dict[str, list[float]] = {
+                "train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []
+            }
+    
             epoch_bar = tqdm(range(num_epochs), desc=f"Fold {fold + 1}", leave=False)
 
-            for epoch in epoch_bar:
+            for _epoch in epoch_bar:
+                # Training step
                 train_loss, train_acc = self._train_step(train_loader, optimizer, criterion)
+
+                # Validation step
                 val_loss, val_acc = self.evaluate(val_loader, criterion)
 
-                fold_hist["train_loss"].append(train_loss)
-                fold_hist["train_acc"].append(train_acc)
-                fold_hist["val_loss"].append(val_loss)
-                fold_hist["val_acc"].append(val_acc)
+                # Store in fold history
+                fold_history["train_loss"].append(train_loss)
+                fold_history["train_acc"].append(train_acc)
+                fold_history["val_loss"].append(val_loss)
+                fold_history["val_acc"].append(val_acc)
+                
+                # Store in global history
                 global_history["train_loss"].append(train_loss)
                 global_history["train_acc"].append(train_acc)
                 global_history["val_loss"].append(val_loss)
@@ -249,24 +279,34 @@ class HAIKU(nn.Module):
                     val_acc=f'{val_acc:.2f}%'
                 )
 
-            # Average metrics over epochs for this fold
-            for key in history:
-                history[key].append(sum(fold_hist[key]) / len(fold_hist[key]))
+            # Average metrics over epochs for this fold and store
+            for key in fold_averaged_history:
+                fold_avg = sum(fold_history[key]) / len(fold_history[key])
+                fold_averaged_history[key].append(fold_avg)
+            
+            # Print fold summary
+            print(f"\nFold {fold + 1} Summary:")
+            print(f"  Avg Train Loss: {fold_averaged_history['train_loss'][-1]:.4f}")
+            print(f"  Avg Train Acc:  {fold_averaged_history['train_acc'][-1]:.2f}%")
+            print(f"  Avg Val Loss:   {fold_averaged_history['val_loss'][-1]:.4f}")
+            print(f"  Avg Val Acc:    {fold_averaged_history['val_acc'][-1]:.2f}%")
 
-        # Average results over folds
-        averaged_history = {k: sum(v) / len(v) for k, v in history.items()}
+        # Average results across all folds
+        averaged_history = {
+            k: sum(v) / len(v) for k, v in fold_averaged_history.items()
+        }
 
         print("\n===== Cross-validation results =====")
-        print(f"Avg Train Acc: {averaged_history['train_acc']:.2f}%")
-        print(f"Avg Val Acc:   {averaged_history['val_acc']:.2f}%")
+        print(f"Avg Train Loss: {averaged_history['train_loss']:.4f} \t Max Val Acc: {max(fold_averaged_history['val_acc']):.2f}%")
+        print(f"Avg Train Acc:  {averaged_history['train_acc']:.2f}% \t Min Val Loss: {min(fold_averaged_history['val_loss']):.4f}")
+        print(f"Avg Val Loss:   {averaged_history['val_loss']:.4f}   \t Min Val Loss: {min(fold_averaged_history['val_loss']):.4f}")
+        print(f"Avg Val Acc:    {averaged_history['val_acc']:.2f}%   \t Max Val Acc: {max(fold_averaged_history['val_acc']):.2f}%")
 
         return global_history, averaged_history
 
-
-
     def _train_step(
         self,
-        dataloader: DataLoader,
+        dataloader: DataLoader,  # pyright: ignore[reportMissingTypeArgument]
         optimizer: torch.optim.Optimizer,
         criterion: nn.Module,
     ) -> tuple[float, float]:
@@ -295,7 +335,7 @@ class HAIKU(nn.Module):
         return avg_loss, accuracy
 
     def evaluate(
-        self, dataloader: DataLoader, criterion: nn.Module
+        self, dataloader: DataLoader, criterion: nn.Module  # pyright: ignore[reportMissingTypeArgument]
     ) -> tuple[float, float]:
         """Evaluate model on validation/test set."""
         self.eval()
@@ -318,3 +358,45 @@ class HAIKU(nn.Module):
         avg_loss = total_loss / len(dataloader)
         accuracy = 100 * correct / total
         return avg_loss, accuracy
+    
+    def save_onnx(
+        self,
+        file_path: str = "haiku_model.onnx",
+        input_shape: tuple[int, int, int] | None = None,
+        opset_version: int = 17,
+        dynamic_batch: bool = True,
+    ) -> None:
+        """
+        Export the trained model to ONNX format.
+
+        Args:
+            file_path: Output ONNX file path.
+            input_shape: Example input shape (default: (1, 12, embedding_dim)).
+            opset_version: ONNX opset version (default 17).
+            dynamic_batch: Whether to allow dynamic batch sizes.
+        """
+        self.eval()  # Switch to eval mode
+        input_shape = input_shape or (1, 12, self.embedding_dim)
+
+        # Create dummy input tensor
+        dummy_input = torch.randn(*input_shape, device=self.device)
+
+        # Dynamic axes allows variable batch sizes at inference
+        dynamic_axes = {"input": {0: "batch_size"}, "output": {0: "batch_size"}} if dynamic_batch else None
+
+        print(f"Exporting HAIKU to ONNX → {file_path}")
+        print(f"Input shape: {tuple(dummy_input.shape)} | Opset: {opset_version}")
+
+        torch.onnx.export(
+            self,
+            dummy_input,
+            file_path,
+            export_params=True,
+            opset_version=opset_version,
+            do_constant_folding=True,
+            input_names=["input"],
+            output_names=["output"],
+            dynamic_axes=dynamic_axes,
+        )
+
+        print(f"Model successfully exported to {file_path}")

@@ -7,10 +7,10 @@ from typing import Any
 from urllib.request import urlretrieve
 
 import numpy as np
+import torch
 from sklearn.preprocessing import StandardScaler
 
-# if you keep these helpers in your project:
-# japanese_speaker_recognition.data_augmentation as data_aug
+from config.config import Config
 from japanese_speaker_recognition.data_augmentation import AugmentationPipeline
 from japanese_speaker_recognition.data_embedding import EmbeddingPipeline
 
@@ -39,60 +39,79 @@ class JapaneseVowelsDataset:
 
     def __init__(
         self,
-        cfg: dict[str, Any],
+        cfg: Config,
         augmenter: AugmentationPipeline | None = None,
         embedding_dim: int = 64,
         embedding_model: str = "nomic-embed-text-v1.5",
         embedidng_precision: int = 2,
+        device: str = "cpu",
         key: str | None = None,
     ) -> None:
-        self.cfg = cfg
-        self.augmenter = augmenter
+        self.cfg: Config = cfg
+        self.augmenter: AugmentationPipeline | None = augmenter
         if key is None:
-            self.key = "default"
+            self.key: str = "default"
         else:
             self.key = key
 
+        self.device: str = device
+
         # ---- Embedding config ----
-        self.embedding_dim = embedding_dim
-        self.embedding_model = embedding_model
-        self.embedding_precision = embedidng_precision
-        
+        self.embedding_dim: int = embedding_dim
+        self.embedding_model: str = embedding_model
+        self.embedding_precision: int = embedidng_precision
 
         # ---- Parse config ----
-        data_url = cfg.get("DATA_URL", "").rstrip("/") + "/"
-        in_dirs = cfg.get("INPUT_DIRS", {})
-        out_dirs = cfg.get("OUTPUT_DIRS", {})
-        aug_cfg = cfg.get("AUGMENTATION", {}) or {}
+        data_url = cfg.data_url.rstrip("/") + "/"
+        in_dirs = cfg.input_dirs
+        out_dirs = cfg.output_dirs
+        aug_cfg = cfg.augmentation 
 
-        self.max_len: int = int(cfg.get("MAX_LEN", 29))
-        self.n_features: int = int(cfg.get("N_FEATURES", 12))
+        self.max_len: int = cfg.max_length
+        self.n_features: int = cfg.n_features
 
-        self.pipeline_flags = {
-            "train": bool(cfg.get("PIPELINE", {}).get("TRAIN", True)),
-            "test": bool(cfg.get("PIPELINE", {}).get("TEST", False)),
-            "augment": bool(cfg.get("PIPELINE", {}).get("AUGMENT", False)),
-        }
+        self.aug_enable: bool = aug_cfg.enabled
+        self.aug_repeats: int = aug_cfg.repeats
 
-        self.aug_enable: bool = bool(aug_cfg.get("AUGMENT", False))
-        self.aug_repeats: int = int(
-            aug_cfg.get("REPEATS", 0)
-        )  # optional; defaults to 0 if not in YAML
-
-        paths = DatasetPaths(
+        self.paths: DatasetPaths = DatasetPaths(
             data_url=data_url,
-            train_file=Path(in_dirs.get("TRAIN_FILE", "data/ae.train")),
-            test_file=Path(in_dirs.get("TEST_FILE", "data/ae.test")),
-            out_dir=Path(out_dirs.get("PROCESSED", "data/processed_data")),
-            aug_file=Path(aug_cfg.get("AUG_FILE"), "data/augmented"),
+            train_file=in_dirs.train_file_dir,
+            test_file=in_dirs.test_file_dir,
+            out_dir=out_dirs.processed_file_dir,
+            aug_file=aug_cfg.aug_dir,
         )
-        self.paths = paths
         self.paths.out_dir.mkdir(parents=True, exist_ok=True)
         
-        self.train_npz = self.paths.out_dir / f"train_{self.key}_data.npz"
-        self.test_npz = self.paths.out_dir / f"test_{self.key}_data.npz"
+        self.train_npz: Path = self.paths.out_dir / f"train_{self.key}_data.npz"
+        self.test_npz: Path = self.paths.out_dir / f"test_{self.key}_data.npz"
 
         self.scaler: StandardScaler | None = None  # fitted on train
+
+    def _move_to_device(self, *arrays: np.ndarray | None) -> tuple:
+        """
+        Move numpy arrays to the specified device as tensors.
+        
+        Args:
+            *arrays: Variable number of numpy arrays or None
+            
+        Returns:
+            tuple: Tensors on the specified device (or None for None inputs)
+        """
+        
+        result: list[np.ndarray | torch.Tensor | None] = []
+        for arr in arrays:
+            if arr is None:
+                result.append(None)
+            elif isinstance(arr, torch.Tensor):
+                result.append(arr.to(self.device))
+            else:
+                tensor = torch.tensor(
+                    arr, 
+                    dtype=torch.float32 if arr.dtype != np.int64 else torch.long
+                )
+                result.append(tensor.to(self.device))
+        
+        return tuple(result) if len(result) > 1 else result[0]  # pyright: ignore[reportReturnType, reportUnknownVariableType]
 
     # --------------------------
     # Public API
@@ -133,16 +152,28 @@ class JapaneseVowelsDataset:
         # Optional augmentation
         # --------------------------
         y_train = self._generate_train_labels()
-        if self.pipeline_flags["augment"] and self.aug_enable and self.aug_repeats > 0:
+        if self.aug_enable and self.aug_repeats > 0:
             print("Augmentation enabled.")
             if not self.augmenter:
                 raise ValueError("Augmentation requested but no augmenter provided.")
 
-            print(f"Running data augmentation ({self.aug_repeats}× repeats)...")
+            print(f"Running data augmentation ({self.aug_repeats}x repeats)...")
+            # Pad sequences before augmentation
+            X_train_padded, _ = self._pad_sequences(train_utts, self.max_len)
+            
             X_aug, y_aug = self._augment_repeat(
-                np.array(train_utts, dtype=object), y_train, repeats=self.aug_repeats
+                X_train_padded, y_train, repeats=self.aug_repeats
             )
-            train_utts_aug = [np.array(utt, dtype=float) for utt in X_aug]
+            
+            # Convert augmented padded arrays back to list of variable-length arrays
+            # by removing padding
+            train_utts_aug = []
+            for _i, aug_seq in enumerate(X_aug):
+                # Find the actual length (before padding was added)
+                # For simplicity, keep the full padded sequence or implement unpadding logic
+                # Here we'll transpose back to (12, T) format
+                train_utts_aug.append(aug_seq.T)  # Shape: (max_len, 12) -> (12, max_len)
+            
             train_utts += train_utts_aug
             y_train = np.concatenate([y_train, y_aug])
             print(f"Augmented training set: now {len(train_utts)} utterances total.")
@@ -171,16 +202,16 @@ class JapaneseVowelsDataset:
                 dimension=self.embedding_dim,
                 precision=self.embedding_precision,
             )
-            
+
             X_train = train_embedder.get_fused
             X_test = test_embedder.get_fused
-            
-            y_train = self._generate_train_labels()
+
+            # y_train = self._generate_train_labels()
             y_test = self._generate_test_labels()
-            
+
             np.savez_compressed(self.train_npz, X_train=X_train, y_train=y_train)
             np.savez_compressed(self.test_npz, X_test=X_test, y_test=y_test)
-            
+
             out = {
             "X_train": X_train,
             "y_train": y_train,
@@ -190,7 +221,7 @@ class JapaneseVowelsDataset:
             "test_npz": str(self.test_npz),
             }
 
-            if self.pipeline_flags["augment"] and self.aug_enable and self.aug_repeats > 0:
+            if self.aug_enable and self.aug_repeats > 0:
                 out.update(
                     {
                         "X_augmented": X_train[-len(y_aug) :],
@@ -218,8 +249,8 @@ class JapaneseVowelsDataset:
             "train_npz": str(self.train_npz),
             "test_npz": str(self.test_npz),
             }
-            
-            if self.pipeline_flags["augment"] and self.aug_enable and self.aug_repeats > 0:
+
+            if self.aug_enable and self.aug_repeats > 0:
                 out.update(
                     {
                         "X_augmented": X_train[-len(y_aug) :],
@@ -282,21 +313,22 @@ class JapaneseVowelsDataset:
         self, sequences: list[np.ndarray], maxlen: int
     ) -> tuple[np.ndarray, np.ndarray]:
         n_samples = len(sequences)
-        n_features = sequences[0].shape[1]
+        n_features = sequences[0].shape[0]  # First dimension is features
         X = np.zeros((n_samples, maxlen, n_features), dtype=np.float32)
         lengths = np.zeros(n_samples, dtype=int)
 
         for i, seq in enumerate(sequences):
-            T = seq.shape[0]
+            T = seq.shape[1]  # Second dimension is time
             lengths[i] = T
-            X[i, :T, :] = seq
+            # Transpose from (n_features, T) to (T, n_features) before storing
+            X[i, :T, :] = seq.T
         return X, lengths
 
     def _minmax_normalize_train_test(
         self, train_utts: list[np.ndarray], test_utts: list[np.ndarray]
     ) -> tuple[list[np.ndarray], list[np.ndarray]]:
         """
-        Min–max normalize each feature dimension of all utterances to [0, 1],
+        Min-max normalize each feature dimension of all utterances to [0, 1],
         using min and max computed across *all* training utterances.
         Args:
             train_utts (list[np.ndarray]): list of arrays (12, T_i) for training set
@@ -347,7 +379,8 @@ class JapaneseVowelsDataset:
             labels += [speaker_id] * utterances_per_speaker
         return np.array(labels, dtype=int)
 
-    def _generate_test_labels(self) -> np.ndarray:
+    @staticmethod
+    def _generate_test_labels() -> np.ndarray:
         block_sizes = [31, 35, 88, 44, 29, 24, 40, 50, 29]
         labels: list[int] = []
         for speaker_id, n in enumerate(block_sizes):

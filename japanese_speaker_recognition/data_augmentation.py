@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Protocol
 
 import numpy as np
 from numpy.typing import NDArray
 from typing_extensions import override
+
+from config.config import AugmentationStep, Config
 
 Array3D = NDArray[np.floating]  # (n_samples, maxlen, n_features)
 
@@ -125,9 +127,9 @@ class AugmentationPipeline:
 
     # ---------- Factory from config ----------
     @staticmethod
-    def from_config(cfg: dict[str, Any]) -> AugmentationPipeline:
-        steps_cfg = (cfg or {}).get("STEPS", []) or []
-        seed = (cfg or {}).get("SEED", None)
+    def from_config(cfg: Config) -> AugmentationPipeline:
+        steps_cfg: list[AugmentationStep] = cfg.augmentation.steps
+        seed = cfg.seed
 
         type_map = {
             "gaussian_noise": AddGaussianNoise,
@@ -138,11 +140,11 @@ class AugmentationPipeline:
 
         steps: list[Probabilistic] = []
         for sc in steps_cfg:
-            type = (sc.get("type") or "").lower().strip()
-            p = float(sc.get("p", 1.0))
+            type = sc.type.lower().strip()
+            p = sc.p or 1.0
             if type not in type_map:
                 raise ValueError(f"Unknown augmentation type: {type}")
-            params = {k: v for k, v in sc.items() if k not in {"type", "p"}}
+            params = {k: v for k, v in vars(sc).items() if k not in {"type", "p"} and v is not None}
             transform = type_map[type](**params)  # dataclass init
             steps.append(Probabilistic(transform=transform, p=p))
 

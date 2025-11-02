@@ -1,61 +1,105 @@
 # japanese speaker recognition
-
-<a target="_blank" href="https://cookiecutter-data-science.drivendata.org/">
-    <img src="https://img.shields.io/badge/CCDS-Project%20template-328F97?logo=cookiecutter" />
-</a>
-
 This project develops a machine learning classifier to identify one of nine japanese male speakers based on short 12-channel time-series recordings of the vowel /ae/.
 
 ## Project Organization
 
 ```
-├── LICENSE            <- Open-source license if one is chosen
-├── Makefile           <- Makefile with convenience commands like `make data` or `make train`
-├── README.md          <- The top-level README for developers using this project.
+├── config
+│   ├── config.py
+│   └── config.yaml
 ├── data
-│   ├── external       <- Data from third party sources.
-│   ├── interim        <- Intermediate data that has been transformed.
-│   ├── processed      <- The final, canonical data sets for modeling.
-│   └── raw            <- The original, immutable data dump.
-│
-├── docs               <- A default mkdocs project; see www.mkdocs.org for details
-│
-├── models             <- Trained and serialized models, model predictions, or model summaries
-│
-├── notebooks          <- Jupyter notebooks. Naming convention is a number (for ordering),
-│                         the creator's initials, and a short `-` delimited description, e.g.
-│                         `1.0-jqp-initial-data-exploration`.
-│
-├── pyproject.toml     <- Project configuration file with package metadata for 
-│                         japanese_speaker_recognition and configuration for tools like black
-│
-├── references         <- Data dictionaries, manuals, and all other explanatory materials.
-│
-├── reports            <- Generated analysis as HTML, PDF, LaTeX, etc.
-│   └── figures        <- Generated graphics and figures to be used in reporting
-│
-├── requirements.txt   <- The requirements file for reproducing the analysis environment, e.g.
-│                         generated with `pip freeze > requirements.txt`
-│
-├── setup.cfg          <- Configuration file for flake8
-│
-└── japanese_speaker_recognition   <- Source code for use in this project.
-    │
-    ├── __init__.py             <- Makes japanese_speaker_recognition a Python module
-    │
-    ├── config.py               <- Store useful variables and configuration
-    │
-    ├── dataset.py              <- Scripts to download or generate data
-    │
-    ├── features.py             <- Code to create features for modeling
-    │
-    ├── modeling                
-    │   ├── __init__.py 
-    │   ├── predict.py          <- Code to run model inference with trained models          
-    │   └── train.py            <- Code to train models
-    │
-    └── plots.py                <- Code to create visualizations
+│   ├── ae.test
+│   ├── ae.train
+│   └── processed_data
+├── docs
+│   └── Project_JapVowels.pdf
+├── habrok_outputs
+├── habrok_shared
+│   └── optuna_study.db
+├── IMPORTANT OUTPUTS
+├── japanese_speaker_recognition
+│   ├── core
+│   │   ├── base.py
+│   │   └── registry.py
+│   ├── data_augmentation.py
+│   ├── data_embedding.py
+│   ├── dataset.py
+│   ├── features
+│   │   └── flatten.py
+│   ├── __init__.py
+│   ├── metrics
+│   │   ├── classification.py
+│   │   └── __init__.py
+│   ├── modeling
+│   │   ├── init.py
+│   │   ├── predict.py
+│   │   └── train.py
+│   ├── models
+│   │   ├── HAIKU.py
+│   │   ├── __pycache__
+│   │   │   ├── cnn.cpython-311.pyc
+│   │   │   └── HAIKU.cpython-311.pyc
+│   │   └── random_forest.py
+│   ├── optimization
+│   │   ├── __init__.py
+│   │   └── optuna_tuner.py
+│   ├── plots.py
+├── main.py
+├── main.sh
+├── Makefile
+├── models
+├── notebooks
+├── optuna_study.db
+├── optuna_study_v3.db
+├── parallel_tuning.py
+├── pyproject.toml
+├── README.md
+├── references
+├── reports
+│   ├── figures
+│   │   ├── frame_level_correlation.png
+│   │   ├── frame_level_correlation_train.png
+│   │   ├── lpc_correlation_heatmap.png
+│   │   ├── training_10K.png
+│   │   └── training_history.png
+│   └── optuna
+│       ├── best_config
+│       │   └── best_model_config.yaml
+│       ├── figures
+│       │   ├── optuna_optimization_history.png
+│       │   ├── optuna_parallel_coordinate.png
+│       │   └── optuna_param_importances.png
+│       └── study
+│           └── optuna_study.pkl
+├── requirements.txt
+├── tests
+│   └── config
+│       └── config_loader_test.py
+├── train_haiku.sh
+├── utils
+│   ├── __pycache__
+│   │   └── utils.cpython-311.pyc
+│   └── utils.py
+└── uv.lock
 ```
 
 --------
 
+# About the project
+
+This project aims to further research the classification strategy of Kaur et al. (2025)doi:(10.18653/v1/2025.acl-long.1557)
+With this strategy we use the Nomic text embedding model to embed our timeseries data into a vector. This combined with the original data gives the data more dimension which in turn can be fed to our fairly simple HAIKU model to predict better then most complex LLM solutions to this problem.
+
+Our goal is to explore more compact models and find a model that has a better accuracy with less parameters then other known solutions.
+
+# How to run the code
+RECOMMENDED: To use the same embedder that we use make sure to create a nomic account on https://www.nomic.ai/ and generate an api key. This can be set in the terminal using "nomic login". 
+Else you may need to configure the code to use a different embedding model this can be done using Huggingface or any other preffered library.
+
+1. All our code can be dynamically configured by tweaking config/config.yaml. 
+
+2. tweak the config file to your preferences to run the model in the desired format.
+
+3. Run "python main.py".
+
+note: When making tweaks to the dataset make sure to give it a new unique key inside of "EMBEDDING".
