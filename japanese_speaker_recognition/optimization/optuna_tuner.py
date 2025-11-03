@@ -137,7 +137,7 @@ class OptunaTuner:
             print(f"Data on CPU - using num_workers={num_workers}, pin_memory={use_pin_memory}")
 
         num_epochs = self.config.model.num_epochs
-        history, avg_history = model.train_model(
+        _global_history, avg_history, fold_averaged_history = model.train_model(
             x_train=self.x_train,
             y_train=self.y_train,
             learning_rate=suggested_params["LEARNING_RATE"],
@@ -149,11 +149,12 @@ class OptunaTuner:
             seed=self.seed,
         )
 
-        max_val_acc = max(fold_history["val_acc"] for fold_history in history)
-        # best_val_acc = avg_history["val_acc"]
+        # Get max validation accuracy across folds (best fold performance)
+        max_val_acc = max(fold_averaged_history["val_acc"])
+        avg_val_acc = avg_history["val_acc"]
         
         print(f"Max validation accuracy across folds: {max_val_acc:.4f}")
-        print(f"Average validation accuracy: {avg_history['val_acc']:.4f}")
+        print(f"Average validation accuracy: {avg_val_acc:.4f}")
         return max_val_acc
 
     def _print_results(self) -> None:

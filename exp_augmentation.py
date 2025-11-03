@@ -283,7 +283,7 @@ class AugmentationExperiment:
         ).to(self.device)
         
         # Train with K-fold CV, report intermediate results for pruning
-        _history, avg_history = model.train_model(
+        _global_history, _avg_history, fold_averaged_history = model.train_model(
             x_train=X_train,
             y_train=y_train,
             learning_rate=learning_rate,
@@ -296,8 +296,8 @@ class AugmentationExperiment:
             trial=trial
         )
         
-        # Return average validation accuracy across all folds
-        return avg_history["val_acc"]
+        # Return MAX validation accuracy across all folds (best fold performance)
+        return max(fold_averaged_history["val_acc"])
     
     def run_optimization(self, storage_url: str | None = None) -> optuna.Study:
         """
