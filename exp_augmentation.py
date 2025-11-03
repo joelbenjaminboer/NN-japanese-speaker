@@ -247,7 +247,7 @@ class AugmentationExperiment:
         conv_channels = trial.suggest_categorical("conv_channels", [128, 256, 512])
         hidden_dim = trial.suggest_categorical("hidden_dim", [16, 32, 64, 128])
         kernel_size = trial.suggest_categorical("kernel_size", [3, 5, 7, 9])
-        batch_size = trial.suggest_categorical("batch_size", [2048, 4096, 8192])  # H100-optimized
+        batch_size = trial.suggest_categorical("batch_size", [8192, 16384, 32768])  # H100-optimized
         
         # ===== Create Cache Key =====
         # Key includes all augmentation parameters to avoid embedding duplicates
