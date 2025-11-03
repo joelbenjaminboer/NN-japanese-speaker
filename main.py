@@ -159,7 +159,7 @@ def main():
         print(f"Training with CPU tensors - using num_workers={num_workers}, pin_memory={pin_memory}")
 
     # Train the model
-    history, _avg_history = model.train_model(
+    history, _avg_history, fold_averaged_history = model.train_model(
         x_train,
         y_train,
         learning_rate = model_cfg.learning_rate,

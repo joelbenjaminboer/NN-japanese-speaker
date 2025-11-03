@@ -247,7 +247,7 @@ class AugmentationExperiment:
         conv_channels = trial.suggest_categorical("conv_channels", [128, 256, 512])
         hidden_dim = trial.suggest_categorical("hidden_dim", [16, 32, 64, 128])
         kernel_size = trial.suggest_categorical("kernel_size", [3, 5, 7, 9])
-        batch_size = trial.suggest_categorical("batch_size", [2048, 4096, 8192])  # H100-optimized
+        batch_size = trial.suggest_categorical("batch_size", [8192, 16384, 32768])  # H100-optimized
         
         # ===== Create Cache Key =====
         # Key includes all augmentation parameters to avoid embedding duplicates
@@ -283,7 +283,7 @@ class AugmentationExperiment:
         ).to(self.device)
         
         # Train with K-fold CV, report intermediate results for pruning
-        _history, avg_history = model.train_model(
+        _global_history, _avg_history, fold_averaged_history = model.train_model(
             x_train=X_train,
             y_train=y_train,
             learning_rate=learning_rate,
@@ -296,8 +296,8 @@ class AugmentationExperiment:
             trial=trial
         )
         
-        # Return average validation accuracy across all folds
-        return avg_history["val_acc"]
+        # Return MAX validation accuracy across all folds (best fold performance)
+        return max(fold_averaged_history["val_acc"])
     
     def run_optimization(self, storage_url: str | None = None) -> optuna.Study:
         """
@@ -312,9 +312,9 @@ class AugmentationExperiment:
         """
         heading("Starting Augmentation + Model Optimization")
         
-        # Single-worker SQLite configuration
+        # Use storage URL from config if not provided
         if storage_url is None:
-            storage_url = "sqlite:///exp_augmentation_study.db"
+            storage_url = self.cfg.optuna.storage_url
         
         # Simplified storage configuration for single worker
         if storage_url.startswith("sqlite"):
@@ -444,7 +444,7 @@ def main():
         cfg=cfg,
         device=device,
         n_trials=cfg.optuna.n_trials,
-        study_name="augmentation_optimization_v1"
+        study_name=cfg.optuna.study_name
     )
     
     study = experiment.run_optimization()

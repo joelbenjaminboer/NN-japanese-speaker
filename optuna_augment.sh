@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=aug_optuna
-#SBATCH --output=habrok_outputs/%j.out
-#SBATCH --error=habrok_outputs/%j.err
+#SBATCH --output=habrok_outputs_v2/%j.out
+#SBATCH --error=habrok_outputs_v2/%j.err
 #SBATCH --partition=digitallab
 #SBATCH --time=24:00:00
 #SBATCH --gpus-per-node=h100_80gb_hbm3_1g.10gb:1

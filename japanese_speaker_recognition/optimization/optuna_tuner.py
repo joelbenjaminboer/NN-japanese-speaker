@@ -116,6 +116,10 @@ class OptunaTuner:
         )
 
     def objective(self, trial: Trial) -> float:
+        """Objective function for Optuna hyperparameter optimization.
+        
+        Returns:
+            """
         suggested_params = self._suggest_hyperparameters_from_config_ranges(trial)
         model_config = self._create_model_config(suggested_params)
 
@@ -133,7 +137,7 @@ class OptunaTuner:
             print(f"Data on CPU - using num_workers={num_workers}, pin_memory={use_pin_memory}")
 
         num_epochs = self.config.model.num_epochs
-        _history, avg_history = model.train_model(
+        _global_history, avg_history, fold_averaged_history = model.train_model(
             x_train=self.x_train,
             y_train=self.y_train,
             learning_rate=suggested_params["LEARNING_RATE"],
@@ -145,10 +149,13 @@ class OptunaTuner:
             seed=self.seed,
         )
 
-        best_val_acc = avg_history["val_acc"]
+        # Get max validation accuracy across folds (best fold performance)
+        max_val_acc = max(fold_averaged_history["val_acc"])
+        avg_val_acc = avg_history["val_acc"]
         
-        print(f"Best validation accuracy: {best_val_acc:.4f}")
-        return best_val_acc
+        print(f"Max validation accuracy across folds: {max_val_acc:.4f}")
+        print(f"Average validation accuracy: {avg_val_acc:.4f}")
+        return max_val_acc
 
     def _print_results(self) -> None:
         if self.study is None:
@@ -170,9 +177,9 @@ class OptunaTuner:
     ) -> Study:
         heading("Starting Hyperparameter Optimization")
 
-        # Use shared database for parallel jobs
+        # Use storage URL from config if not provided
         if storage_url is None:
-            storage_url = "sqlite:///optuna_study.db"
+            storage_url = self.config.optuna.storage_url
 
         # Configure SQLite for NFS environments with high timeout
         # Note: WAL mode does NOT work on network filesystems (NFS) due to

@@ -41,8 +41,10 @@ tuner = OptunaTuner(
 )
 
 # === Shared storage file ===
-storage_url = "sqlite:///habrok_shared/optuna_study.db"
+storage_url = cfg.optuna.storage_url
 # IMPORTANT: this folder must exist and be on shared storage, e.g., /scratch/<user>/ or $HOME/
 
-Path("habrok_shared").mkdir(exist_ok=True)
+# Ensure parent directory exists
+db_path = storage_url.replace("sqlite:///", "")
+Path(db_path).parent.mkdir(exist_ok=True, parents=True)
 tuner.optimize(storage_url=storage_url)

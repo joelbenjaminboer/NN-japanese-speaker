@@ -201,8 +201,15 @@ class HAIKU(nn.Module):
         pin_memory: bool = True,
         seed: int = 42,
         trial = None  # optuna.Trial for pruning support
-    ) -> tuple[dict[str, list[float]], dict[str, float]]:
-        """Train the model using K-Fold cross-validation and return averaged training history."""
+        ) -> tuple[dict[str, list[float]], dict[str, float], dict[str, list[float]]]:
+        """Train the model using K-Fold cross-validation and return averaged training history.
+        
+        Returns:
+            tuple containing:
+                - global_history: all epoch metrics across all folds
+                - averaged_history: single averaged value per metric across all folds
+                - fold_averaged_history: average metrics for each fold (list with one value per fold)
+        """
 
         torch.manual_seed(seed)
         self.to(self.device)
@@ -310,7 +317,7 @@ class HAIKU(nn.Module):
         print(f"Avg Val Loss:   {averaged_history['val_loss']:.4f}   \t Min Val Loss: {min(fold_averaged_history['val_loss']):.4f}")
         print(f"Avg Val Acc:    {averaged_history['val_acc']:.2f}%   \t Max Val Acc: {max(fold_averaged_history['val_acc']):.2f}%")
 
-        return global_history, averaged_history
+        return global_history, averaged_history, fold_averaged_history
 
     def _train_step(
         self,
