@@ -34,8 +34,8 @@ INPUT_DIRS:
 
 OUTPUT_DIRS:
   PROCESSED: "data/processed_data"
-  FIGURES: "reports/figures"
-  MODELS: "models"
+  FIGURES: "reports/figures_v2"
+  MODELS: "models_v2"
 
 #HAIKU
 MODEL:
@@ -59,10 +59,11 @@ OPTUNA:
   ENABLED: true  # Enable for augmentation experiment
   SHOW_PROGRESS_BAR: true
   N_TRIALS: 100  # More trials for joint optimization (augmentation + model)
-  STUDY_NAME: "augmentation_optimization_v1"
-  FIGURES_DIR: "reports/optuna/figures"
-  STUDY_DIR: "reports/optuna/study"
-  BEST_CONFIG_DIR: "reports/optuna/best_config"
+  STUDY_NAME: "augmentation_optimization_v2"
+  STORAGE_URL: "sqlite:///exp_augmentation_study_v2.db"
+  FIGURES_DIR: "reports/optuna/figures_v2"
+  STUDY_DIR: "reports/optuna/studys_v2"
+  BEST_CONFIG_DIR: "reports/optuna/best_config_v2"
   RANGES:
     LEARNING_RATE: [1e-5, 1e-2] # low, high
     DROPOUT: [0.1, 0.5] # low, high

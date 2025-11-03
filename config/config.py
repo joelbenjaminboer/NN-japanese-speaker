@@ -203,6 +203,7 @@ class Optuna:
     show_progress_bar: bool
     n_trials: int
     study_name: str
+    storage_url: str
     figures_dir: Path
     study_dir: Path
     best_config_dir: Path
@@ -216,6 +217,7 @@ class Optuna:
             f"  Show Progress Bar: {self.show_progress_bar}\n"
             f"  N Trials: {self.n_trials}\n"
             f"  Study Name: {self.study_name}\n"
+            f"  Storage URL: {self.storage_url}\n"
             f"  Figures Dir: {self.figures_dir}\n"
             f"  Study Dir: {self.study_dir}\n"
             f"  Best Config Dir: {self.best_config_dir}\n"
@@ -230,6 +232,7 @@ class Optuna:
             show_progress_bar=data['SHOW_PROGRESS_BAR'],
             n_trials=data['N_TRIALS'],
             study_name=data['STUDY_NAME'],
+            storage_url=data.get('STORAGE_URL', 'sqlite:///optuna_study.db'),
             figures_dir=Path(data['FIGURES_DIR']),
             study_dir=Path(data['STUDY_DIR']),
             best_config_dir=Path(data['BEST_CONFIG_DIR']),

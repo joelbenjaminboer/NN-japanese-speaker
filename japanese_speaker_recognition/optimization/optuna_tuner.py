@@ -176,9 +176,9 @@ class OptunaTuner:
     ) -> Study:
         heading("Starting Hyperparameter Optimization")
 
-        # Use shared database for parallel jobs
+        # Use storage URL from config if not provided
         if storage_url is None:
-            storage_url = "sqlite:///optuna_study.db"
+            storage_url = self.config.optuna.storage_url
 
         # Configure SQLite for NFS environments with high timeout
         # Note: WAL mode does NOT work on network filesystems (NFS) due to

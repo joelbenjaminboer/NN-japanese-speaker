@@ -312,9 +312,9 @@ class AugmentationExperiment:
         """
         heading("Starting Augmentation + Model Optimization")
         
-        # Single-worker SQLite configuration
+        # Use storage URL from config if not provided
         if storage_url is None:
-            storage_url = "sqlite:///exp_augmentation_study.db"
+            storage_url = self.cfg.optuna.storage_url
         
         # Simplified storage configuration for single worker
         if storage_url.startswith("sqlite"):
@@ -444,7 +444,7 @@ def main():
         cfg=cfg,
         device=device,
         n_trials=cfg.optuna.n_trials,
-        study_name="augmentation_optimization_v1"
+        study_name=cfg.optuna.study_name
     )
     
     study = experiment.run_optimization()
