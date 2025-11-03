@@ -5,7 +5,7 @@ MAX_LEN: 29  # longest utterance length (7–29)
 N_FEATURES: 12
 
 AUGMENTATION:
-  AUGMENT: false
+  AUGMENT: true
   REPEATS: 2
   AUG_FILE: "data/augmented_data.npz"
   SEED: 42
@@ -15,10 +15,13 @@ AUGMENTATION:
       p: 1.0
     - type: random_scaling
       scale_range: [0.95, 1.05]
+      P: 0.8
     - type: time_masking
       max_mask_percentage: 0.01
-    # - type: frequency_masking
-    #   max_mask_percentage: 0.01
+      p: 0.5
+    - type: frequency_masking
+      max_mask_percentage: 0.01
+      p: 0.7
 
 EMBEDDING:
   MODEL: "nomic-ai/nomic-embed-text-v1.5"
@@ -56,7 +59,7 @@ MODEL:
   DEVICE: "cuda"
 
 OPTUNA:
-  ENABLED: true  # Enable for augmentation experiment
+  ENABLED: false  # Enable for augmentation experiment
   SHOW_PROGRESS_BAR: true
   N_TRIALS: 100  # More trials for joint optimization (augmentation + model)
   STUDY_NAME: "augmentation_optimization_v1"

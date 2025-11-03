@@ -70,7 +70,10 @@ def main():
     ds = JapaneseVowelsDataset(cfg, 
                                augmenter=augmenter,
                                embedding_dim=embed_cfg.dimension,
-                               key=embed_cfg.key)
+                               embedding_model=embed_cfg.model,
+                               device=device,
+                               key=embed_cfg.key
+                               )
 
     artifacts = ds.prepare()
     x_train = artifacts["X_train"]
