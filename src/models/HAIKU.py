@@ -50,6 +50,7 @@ class HAIKU(nn.Module):
         self,
         num_classes: int = 9,
         dropout: float = 0.3,
+        dropout_mlp: float = 0.0,
         embedding_dim: int = 64,
         kernel_size: int = 3,
         conv_channels: int = 128,
@@ -83,7 +84,7 @@ class HAIKU(nn.Module):
             nn.Flatten(),  # [B, conv_channels, 1] -> [B, conv_channels]
             nn.Linear(conv_channels, hidden_dim),  # First linear layer
             nn.GELU(),
-            nn.Dropout(dropout),
+            nn.Dropout(dropout_mlp),
             nn.Linear(hidden_dim, num_classes),  # Second linear layer
         )
 
@@ -445,14 +446,20 @@ class HAIKU(nn.Module):
             batch_size: Batch size for evaluation
             class_names: List of class names for axis labels
         """
-
+        import matplotlib.pyplot as plt
+        import numpy as np
+        from sklearn.metrics import confusion_matrix
+        from sklearn.linear_model import LogisticRegression
+        import seaborn as sns
         
         self.eval()
         self.to(self.device)
         
+        # Create DataLoader
         dataset = TensorDataset(x_data, y_data)
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
-    
+        
+        # Storage for internal representations
         conv_features = []
         pooled_features = []
         hidden_features = []
@@ -463,32 +470,43 @@ class HAIKU(nn.Module):
         with torch.no_grad():
             for batch_x, batch_y in tqdm(dataloader, desc="Processing"):
                 batch_x = batch_x.to(self.device)
+                
+                # 1. After convolution
                 conv_out = self.convolution(batch_x)
                 conv_features.append(conv_out.cpu())
-
+                
+                # 2. After pooling
                 pooled_out = self.global_pool(conv_out)
                 pooled_features.append(pooled_out.squeeze(-1).cpu())
+                
+                # 3. After first linear layer (hidden)
                 flattened = pooled_out.view(pooled_out.size(0), -1)
-                hidden_out = self.perceptron[1](flattened)
-                hidden_out = self.perceptron[2](hidden_out)
+                hidden_out = self.perceptron[1](flattened)  # First linear layer
+                hidden_out = self.perceptron[2](hidden_out)  # GELU
                 hidden_features.append(hidden_out.cpu())
+                
+                # 4. Final output
                 final_out = self(batch_x)
                 final_logits.append(final_out.cpu())
                 
-                all_labels.append(batch_y)
+                all_labels.append(batch_y.cpu())
         
+        # Concatenate all batches
         conv_features = torch.cat(conv_features, dim=0)
         pooled_features = torch.cat(pooled_features, dim=0)
         hidden_features = torch.cat(hidden_features, dim=0)
         final_logits = torch.cat(final_logits, dim=0)
         all_labels = torch.cat(all_labels, dim=0).numpy()
-
+        
+        # Train simple classifiers on internal representations
         print("Training classifiers on internal representations...")
         
+        # Flatten conv features for classifier
         conv_flat = conv_features.view(conv_features.size(0), -1).numpy()
         pooled_flat = pooled_features.numpy()
         hidden_flat = hidden_features.numpy()
-
+        
+        # Train logistic regression on each representation
         clf_conv = LogisticRegression(max_iter=1000, random_state=42)
         clf_conv.fit(conv_flat, all_labels)
         pred_conv = clf_conv.predict(conv_flat)
@@ -505,6 +523,7 @@ class HAIKU(nn.Module):
         _, pred_final = torch.max(final_logits, 1)
         pred_final = pred_final.numpy()
         
+        # Create confusion matrices
         cm_conv = confusion_matrix(all_labels, pred_conv)
         cm_pooled = confusion_matrix(all_labels, pred_pooled)
         cm_hidden = confusion_matrix(all_labels, pred_hidden)
@@ -519,7 +538,8 @@ class HAIKU(nn.Module):
         # Set up class names
         if class_names is None:
             class_names = [str(i) for i in range(cm_final.shape[0])]
-
+        
+        # Create 2x2 subplot
         fig, axes = plt.subplots(2, 2, figsize=(16, 14))
         
         matrices = [

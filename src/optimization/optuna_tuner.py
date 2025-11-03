@@ -104,6 +104,7 @@ class OptunaTuner:
             kernel_size=int(suggested_params.get("KERNEL_SIZE", 3)),
             conv_channels=int(suggested_params.get("CONV_CHANNELS", 32)),
             dropout=float(suggested_params.get("DROPOUT", 0.1)),
+            dropout_mlp=float(suggested_params.get("DROPOUT_MLP", 0.1)),
             input_channels=model_config.input_channels,
             hidden_dim=int(suggested_params.get("HIDDEN_DIM", 64)),
             learning_rate=float(suggested_params.get("LEARNING_RATE", 1e-4)),
@@ -228,6 +229,7 @@ class OptunaTuner:
         model_section = self.config.model
         return {
             "DROPOUT": best_params["DROPOUT"],
+            "DROPOUT_MLP": model_section.dropout_mlp,
             "EMBEDDING_DIM": model_section.embedding_dim,
             "KERNEL_SIZE": best_params["KERNEL_SIZE"],
             "CONV_CHANNELS": best_params["CONV_CHANNELS"],

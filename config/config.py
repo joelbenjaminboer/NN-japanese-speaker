@@ -166,6 +166,7 @@ class OptunaRanges:
     """Configuration for Optuna hyperparameter ranges."""
     learning_rate: list[float]
     dropout: list[float]
+    dropout_mlp: list[float]
     conv_channels: list[int]
     hidden_dim: list[int]
     kernel_size: list[int]
@@ -177,6 +178,7 @@ class OptunaRanges:
             f"OptunaRanges:\n"
             f"  Learning Rate: {self.learning_rate}\n"
             f"  Dropout: {self.dropout}\n"
+            f"  Dropout MLP: {self.dropout_mlp}\n"
             f"  Conv Channels: {self.conv_channels}\n"
             f"  Hidden Dim: {self.hidden_dim}\n"
             f"  Kernel Size: {self.kernel_size}\n"
@@ -189,6 +191,7 @@ class OptunaRanges:
         return cls(
             learning_rate=data['LEARNING_RATE'],
             dropout=data['DROPOUT'],
+            dropout_mlp=data['DROPOUT_MLP'],
             conv_channels=data['CONV_CHANNELS'],
             hidden_dim=data['HIDDEN_DIM'],
             kernel_size=data['KERNEL_SIZE'],
@@ -249,6 +252,7 @@ class Model:
     kernel_size: int
     conv_channels: int
     dropout: float
+    dropout_mlp: float
     input_channels: int
     hidden_dim: int
     learning_rate: float
@@ -269,6 +273,7 @@ class Model:
             f"  Kernel Size: {self.kernel_size}\n"
             f"  Conv Channels: {self.conv_channels}\n"
             f"  Dropout: {self.dropout}\n"
+            f"  Dropout MLP: {self.dropout_mlp}\n"
             f"  Input Channels: {self.input_channels}\n"
             f"  Hidden Dim: {self.hidden_dim}\n"
             f"  Learning Rate: {self.learning_rate}\n"
@@ -291,6 +296,7 @@ class Model:
             kernel_size=data['KERNEL_SIZE'],
             conv_channels=data['CONV_CHANNELS'],
             dropout=data['DROPOUT'],
+            dropout_mlp=data['DROPOUT_MLP'],
             input_channels=data['INPUT_CHANNELS'],
             hidden_dim=data['HIDDEN_DIM'],
             learning_rate=data['LEARNING_RATE'],

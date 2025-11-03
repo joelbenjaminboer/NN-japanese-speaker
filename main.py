@@ -182,8 +182,11 @@ def main():
     # -------------------------------------------
     # Model Evaluation
     # -------------------------------------------
-    model.save_confusion_matrix(x_test, y_test, cfg.output_dirs.figures_dir / "confusion_matrix.png", batch_size=batch_size)
-    
+    model.save_confusion_matrix(x_test,
+                                y_test,
+                                cfg.output_dirs.figures_dir / "confusion_matrix.png",
+                                batch_size=batch_size,
+                                class_names=["1","2","3","4","5","6","7","8","9"])
     test_set = TensorDataset(x_test, y_test)
     test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False)
     avg_loss, test_acc = model.evaluate(test_loader, criterion=nn.CrossEntropyLoss())

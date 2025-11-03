@@ -244,6 +244,7 @@ class AugmentationExperiment:
         # ===== Suggest Model Hyperparameters =====
         learning_rate = trial.suggest_float("learning_rate", 1e-5, 1e-2, log=True)
         dropout = trial.suggest_float("dropout", 0.1, 0.5)
+        dropout_mlp = trial.suggest_float("dropout_mlp", 0.1, 0.5)
         conv_channels = trial.suggest_categorical("conv_channels", [128, 256, 512])
         hidden_dim = trial.suggest_categorical("hidden_dim", [16, 32, 64, 128])
         kernel_size = trial.suggest_categorical("kernel_size", [3, 5, 7, 9])
@@ -274,6 +275,7 @@ class AugmentationExperiment:
         model = HAIKU(
             num_classes=self.cfg.model.num_classes,
             dropout=dropout,
+            dropout_mlp=dropout_mlp,
             embedding_dim=self.cfg.embedding.dimension,
             kernel_size=kernel_size,
             conv_channels=conv_channels,

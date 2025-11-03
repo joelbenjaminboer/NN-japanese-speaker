@@ -5,7 +5,7 @@ MAX_LEN: 29  # longest utterance length (7–29)
 N_FEATURES: 12
 
 AUGMENTATION:
-  AUGMENT: true
+  AUGMENT: false
   REPEATS: 4
   AUG_FILE: "data/augmented_data.npz"
   SEED: 42
@@ -28,7 +28,7 @@ EMBEDDING:
   PRE_PRECISION: 2
   BATCH_SIZE: 256  # Batch size for embedding (higher = faster, but uses more GPU memory)
   OUTPUT_FILE: "data/processed_data/"
-  KEY: "testing_optimal"
+  KEY: "drop"
 
 INPUT_DIRS:
   TRAIN_FILE: "data/ae.train"
@@ -47,10 +47,11 @@ MODEL:
   KERNEL_SIZE: 9
   CONV_CHANNELS: 512
   DROPOUT: 0.11914524644085248
+  DROPOUT_MLP: 0.0
   INPUT_CHANNELS: 12
   HIDDEN_DIM: 64
   LEARNING_RATE: 0.006214187437828991  # Conservative starting point for large batches
-  BATCH_SIZE: 32768  # H100-optimized: 80GB memory allows huge batches
+  BATCH_SIZE: 12768  # H100-optimized: 80GB memory allows huge batches
   NUM_EPOCHS: 500  # Reduced: large batches converge faster
   K_FOLDS: 5
   NUM_WORKERS: 0  # Set to 0 for GPU training (data already on GPU)
@@ -68,7 +69,8 @@ OPTUNA:
   BEST_CONFIG_DIR: "reports/optuna/best_config_v4"
   RANGES:
     LEARNING_RATE: [1e-5, 1e-2] # low, high
-    DROPOUT: [0.1, 0.5] # low, high
+    DROPOUT: [0.0, 0.7] # low, high
+    DROPOUT_MLP: [0.0, 0.7] # low, high
     CONV_CHANNELS: [128, 256, 512]
     HIDDEN_DIM: [16, 32, 64, 128]
     KERNEL_SIZE: [3, 5, 7, 9]
