@@ -11,8 +11,8 @@ import torch
 from sklearn.preprocessing import StandardScaler
 
 from config.config import Config
-from japanese_speaker_recognition.data_augmentation import AugmentationPipeline
-from japanese_speaker_recognition.data_embedding import BaseEmbeddingPipeline, LocalEmbeddingPipeline
+from src.data_augmentation import AugmentationPipeline
+from src.data_embedding import BaseEmbeddingPipeline, LocalEmbeddingPipeline
 
 
 @dataclass

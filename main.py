@@ -9,10 +9,10 @@ import yaml
 from torch.utils.data import TensorDataset
 
 from config.config import Config, Model
-from japanese_speaker_recognition.data_augmentation import AugmentationPipeline
-from japanese_speaker_recognition.dataset import JapaneseVowelsDataset
-from japanese_speaker_recognition.models.HAIKU import HAIKU
-from japanese_speaker_recognition.optimization.optuna_tuner import OptunaTuner
+from src.data_augmentation import AugmentationPipeline
+from src.dataset import JapaneseVowelsDataset
+from src.models.HAIKU import HAIKU
+from src.optimization.optuna_tuner import OptunaTuner
 from utils.utils import heading
 
 
@@ -172,7 +172,7 @@ def main():
     )
 
     # plot the training history
-    plot_training_history(history, cfg.output_dirs.figures_dir)
+    #plot_training_history(history, cfg.output_dirs.figures_dir)
 
     # Print final results
     heading("Training Complete")
@@ -182,6 +182,8 @@ def main():
     # -------------------------------------------
     # Model Evaluation
     # -------------------------------------------
+    model.save_confusion_matrix(x_test, y_test, cfg.output_dirs.figures_dir / "confusion_matrix.png", batch_size=batch_size)
+    
     test_set = TensorDataset(x_test, y_test)
     test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False)
     avg_loss, test_acc = model.evaluate(test_loader, criterion=nn.CrossEntropyLoss())

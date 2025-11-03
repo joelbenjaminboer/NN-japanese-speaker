@@ -6,22 +6,21 @@ N_FEATURES: 12
 
 AUGMENTATION:
   AUGMENT: true
-  REPEATS: 2
+  REPEATS: 4
   AUG_FILE: "data/augmented_data.npz"
   SEED: 42
   STEPS:
-    - type: gaussian_noise
-      noise_factor: 0.001
-      p: 1.0
+    #- type: gaussian_noise
+    #  noise_factor: 0.001
+    #  p: 1.0
     - type: random_scaling
-      scale_range: [0.95, 1.05]
-      P: 0.8
-    - type: time_masking
-      max_mask_percentage: 0.01
-      p: 0.5
+      scale_range: [0.9427868148270747, 1.075305412442917]
+      p: 0.8541486938177303
+    #- type: time_masking
+    #  max_mask_percentage: 0.01
     - type: frequency_masking
-      max_mask_percentage: 0.01
-      p: 0.7
+      max_mask_percentage: 0.016255177460727355
+      p: 0.5607572007731993
 
 EMBEDDING:
   MODEL: "nomic-ai/nomic-embed-text-v1.5"
@@ -29,7 +28,7 @@ EMBEDDING:
   PRE_PRECISION: 2
   BATCH_SIZE: 256  # Batch size for embedding (higher = faster, but uses more GPU memory)
   OUTPUT_FILE: "data/processed_data/"
-  KEY: "augment512"
+  KEY: "testing_optimal"
 
 INPUT_DIRS:
   TRAIN_FILE: "data/ae.train"
@@ -38,20 +37,20 @@ INPUT_DIRS:
 OUTPUT_DIRS:
   PROCESSED: "data/processed_data"
   FIGURES: "reports/figures_v4"
-  MODELS: "models_v4"
+  MODELS: "models"
 
 #HAIKU
 MODEL:
   LOAD_BEST_CONFIG: false
   NUM_CLASSES: 9
   EMBEDDING_DIM: 512
-  KERNEL_SIZE: 3
-  CONV_CHANNELS: 128
-  DROPOUT: 0.3
+  KERNEL_SIZE: 9
+  CONV_CHANNELS: 512
+  DROPOUT: 0.11914524644085248
   INPUT_CHANNELS: 12
   HIDDEN_DIM: 64
-  LEARNING_RATE: 0.001  # Conservative starting point for large batches
-  BATCH_SIZE: 4096  # H100-optimized: 80GB memory allows huge batches
+  LEARNING_RATE: 0.006214187437828991  # Conservative starting point for large batches
+  BATCH_SIZE: 32768  # H100-optimized: 80GB memory allows huge batches
   NUM_EPOCHS: 500  # Reduced: large batches converge faster
   K_FOLDS: 5
   NUM_WORKERS: 0  # Set to 0 for GPU training (data already on GPU)
@@ -63,7 +62,7 @@ OPTUNA:
   SHOW_PROGRESS_BAR: true
   N_TRIALS: 100  # More trials for joint optimization (augmentation + model)
   STUDY_NAME: "augmentation_optimization_v4"
-  STORAGE_URL: "sqlite:///exp_augmentation_study_v4.db"
+  STORAGE_URL: "sqlite:///optuna_studies/exp_augmentation_study_v4.db"
   FIGURES_DIR: "reports/optuna/figures_v4"
   STUDY_DIR: "reports/optuna/studys_v4"
   BEST_CONFIG_DIR: "reports/optuna/best_config_v4"

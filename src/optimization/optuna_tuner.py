@@ -6,7 +6,7 @@ from optuna import Study, Trial
 from torch import Tensor
 
 from config.config import Config, Model, OptunaRanges
-from japanese_speaker_recognition.models.HAIKU import HAIKU
+from src.models.HAIKU import HAIKU
 from utils.utils import heading
 
 

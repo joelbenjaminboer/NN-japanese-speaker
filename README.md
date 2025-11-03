@@ -95,13 +95,12 @@ Our goal is to explore more compact models and find a model that has a better ac
 
 # How to run the code
 
-RECOMMENDED: To use the same embedder that we use make sure to create a nomic account on https://www.nomic.ai/ and generate an api key. This can be set in the terminal using "nomic login".
-Else you may need to configure the code to use a different embedding model this can be done using Huggingface or any other preffered library.
-
 1. All our code can be dynamically configured by tweaking config/config.yaml.
 
 2. tweak the config file to your preferences to run the model in the desired format.
 
 3. Run "python main.py".
+
+4. To review an optuna study, run "optuna-dashboard sqlite:///optuna_studies/study_name.db" with the present exp_augmentation_study_v4.db being the most up to date and accurate
 
 **Note:** When making tweaks to the dataset, make sure to give it a new unique key inside of "EMBEDDING" to avoid cache conflicts.

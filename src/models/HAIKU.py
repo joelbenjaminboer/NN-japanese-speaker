@@ -19,6 +19,11 @@ from utils.utils import heading
 
 # BatchData: TypeAlias = tuple[torch.Tensor, torch.Tensor]
 # TrainDataset: TypeAlias = TensorDataset | Subset[TensorDataset]
+import matplotlib.pyplot as plt
+import numpy as np
+from sklearn.metrics import confusion_matrix
+from sklearn.linear_model import LogisticRegression
+import seaborn as sns
 
 class HAIKU(nn.Module):
     """
@@ -415,3 +420,145 @@ class HAIKU(nn.Module):
         )
 
         print(f"Model successfully exported to {file_path}")
+        
+    def save_confusion_matrix(
+        self,
+        x_data: torch.Tensor,
+        y_data: torch.Tensor,
+        file_path: str = "internal_confusion_matrix.png",
+        batch_size: int = 32,
+        class_names: list[str] | None = None,
+    ) -> None:
+        """
+        Generate and save confusion matrices showing internal layer predictions.
+        
+        This visualizes how well different stages of the model can classify the data:
+        1. After convolution layer (CNN features)
+        2. After global pooling
+        3. After first linear layer (hidden representation)
+        4. Final output (full model)
+        
+        Args:
+            x_data: Input features tensor [N, 12, embedding_dim]
+            y_data: True labels tensor [N]
+            file_path: Output file path for the confusion matrix grid
+            batch_size: Batch size for evaluation
+            class_names: List of class names for axis labels
+        """
+
+        
+        self.eval()
+        self.to(self.device)
+        
+        dataset = TensorDataset(x_data, y_data)
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+    
+        conv_features = []
+        pooled_features = []
+        hidden_features = []
+        final_logits = []
+        all_labels = []
+        
+        print("Extracting internal representations...")
+        with torch.no_grad():
+            for batch_x, batch_y in tqdm(dataloader, desc="Processing"):
+                batch_x = batch_x.to(self.device)
+                conv_out = self.convolution(batch_x)
+                conv_features.append(conv_out.cpu())
+
+                pooled_out = self.global_pool(conv_out)
+                pooled_features.append(pooled_out.squeeze(-1).cpu())
+                flattened = pooled_out.view(pooled_out.size(0), -1)
+                hidden_out = self.perceptron[1](flattened)
+                hidden_out = self.perceptron[2](hidden_out)
+                hidden_features.append(hidden_out.cpu())
+                final_out = self(batch_x)
+                final_logits.append(final_out.cpu())
+                
+                all_labels.append(batch_y)
+        
+        conv_features = torch.cat(conv_features, dim=0)
+        pooled_features = torch.cat(pooled_features, dim=0)
+        hidden_features = torch.cat(hidden_features, dim=0)
+        final_logits = torch.cat(final_logits, dim=0)
+        all_labels = torch.cat(all_labels, dim=0).numpy()
+
+        print("Training classifiers on internal representations...")
+        
+        conv_flat = conv_features.view(conv_features.size(0), -1).numpy()
+        pooled_flat = pooled_features.numpy()
+        hidden_flat = hidden_features.numpy()
+
+        clf_conv = LogisticRegression(max_iter=1000, random_state=42)
+        clf_conv.fit(conv_flat, all_labels)
+        pred_conv = clf_conv.predict(conv_flat)
+        
+        clf_pooled = LogisticRegression(max_iter=1000, random_state=42)
+        clf_pooled.fit(pooled_flat, all_labels)
+        pred_pooled = clf_pooled.predict(pooled_flat)
+        
+        clf_hidden = LogisticRegression(max_iter=1000, random_state=42)
+        clf_hidden.fit(hidden_flat, all_labels)
+        pred_hidden = clf_hidden.predict(hidden_flat)
+        
+        # Final model predictions
+        _, pred_final = torch.max(final_logits, 1)
+        pred_final = pred_final.numpy()
+        
+        cm_conv = confusion_matrix(all_labels, pred_conv)
+        cm_pooled = confusion_matrix(all_labels, pred_pooled)
+        cm_hidden = confusion_matrix(all_labels, pred_hidden)
+        cm_final = confusion_matrix(all_labels, pred_final)
+        
+        # Normalize
+        cm_conv = cm_conv.astype('float') / cm_conv.sum(axis=1)[:, np.newaxis]
+        cm_pooled = cm_pooled.astype('float') / cm_pooled.sum(axis=1)[:, np.newaxis]
+        cm_hidden = cm_hidden.astype('float') / cm_hidden.sum(axis=1)[:, np.newaxis]
+        cm_final = cm_final.astype('float') / cm_final.sum(axis=1)[:, np.newaxis]
+        
+        # Set up class names
+        if class_names is None:
+            class_names = [str(i) for i in range(cm_final.shape[0])]
+
+        fig, axes = plt.subplots(2, 2, figsize=(16, 14))
+        
+        matrices = [
+            (cm_conv, "After Convolution Layer", axes[0, 0]),
+            (cm_pooled, "After Global Pooling", axes[0, 1]),
+            (cm_hidden, "After Hidden Layer", axes[1, 0]),
+            (cm_final, "Final Output", axes[1, 1])
+        ]
+        
+        accuracies = []
+        
+        for cm, title, ax in matrices:
+            sns.heatmap(
+                cm,
+                annot=True,
+                fmt='.2f',
+                cmap='Blues',
+                xticklabels=class_names,
+                yticklabels=class_names,
+                ax=ax,
+                cbar_kws={'label': 'Proportion'}
+            )
+            
+            acc = 100 * np.trace(cm) / cm.shape[0]
+            accuracies.append(acc)
+            ax.set_title(f"{title}\nAccuracy: {acc:.2f}%", fontsize=12, pad=10)
+            ax.set_ylabel('True Label', fontsize=10)
+            ax.set_xlabel('Predicted Label', fontsize=10)
+        
+        plt.suptitle('Internal Model Confusion Matrices', fontsize=16, y=0.995)
+        plt.tight_layout()
+        
+        # Save figure
+        plt.savefig(file_path, dpi=300, bbox_inches='tight')
+        print(f"\nInternal confusion matrices saved to {file_path}")
+        print("\nAccuracy at each stage:")
+        print(f"  Conv Layer:    {accuracies[0]:.2f}%")
+        print(f"  Pooled:        {accuracies[1]:.2f}%")
+        print(f"  Hidden Layer:  {accuracies[2]:.2f}%")
+        print(f"  Final Output:  {accuracies[3]:.2f}%")
+        
+        plt.close()

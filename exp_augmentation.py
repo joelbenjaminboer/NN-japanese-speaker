@@ -28,7 +28,7 @@ from optuna.pruners import MedianPruner
 from optuna.samplers import TPESampler
 
 from config.config import AugmentationStep, Config
-from japanese_speaker_recognition.data_augmentation import (
+from src.data_augmentation import (
     AddGaussianNoise,
     AugmentationPipeline,
     FrequencyMasking,
@@ -36,8 +36,8 @@ from japanese_speaker_recognition.data_augmentation import (
     RandomScaling,
     TimeMasking,
 )
-from japanese_speaker_recognition.dataset import JapaneseVowelsDataset
-from japanese_speaker_recognition.models.HAIKU import HAIKU
+from src.dataset import JapaneseVowelsDataset
+from src.models.HAIKU import HAIKU
 from utils.utils import heading
 
 
