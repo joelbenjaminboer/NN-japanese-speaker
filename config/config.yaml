@@ -1,0 +1,77 @@
+DATA_URL: "https://archive.ics.uci.edu/ml/machine-learning-databases/JapaneseVowels/"
+
+SEED: 42
+MAX_LEN: 29  # longest utterance length (7–29)
+N_FEATURES: 12
+
+AUGMENTATION:
+  AUGMENT: false
+  REPEATS: 4
+  AUG_FILE: "data/augmented_data.npz"
+  SEED: 42
+  STEPS:
+    #- type: gaussian_noise
+    #  noise_factor: 0.001
+    #  p: 1.0
+    - type: random_scaling
+      scale_range: [0.9427868148270747, 1.075305412442917]
+      p: 0.8541486938177303
+    #- type: time_masking
+    #  max_mask_percentage: 0.01
+    - type: frequency_masking
+      max_mask_percentage: 0.016255177460727355
+      p: 0.5607572007731993
+
+EMBEDDING:
+  MODEL: "nomic-ai/nomic-embed-text-v1.5"
+  DIMENSION: 512
+  PRE_PRECISION: 2
+  BATCH_SIZE: 256  # Batch size for embedding (higher = faster, but uses more GPU memory)
+  OUTPUT_FILE: "data/processed_data/"
+  KEY: "drop"
+
+INPUT_DIRS:
+  TRAIN_FILE: "data/ae.train"
+  TEST_FILE: "data/ae.test"
+
+OUTPUT_DIRS:
+  PROCESSED: "data/processed_data"
+  FIGURES: "reports/figures_1.0drop_v5"
+  MODELS: "models_1.0drop_v5"
+
+#HAIKU
+MODEL:
+  LOAD_BEST_CONFIG: false
+  NUM_CLASSES: 9
+  EMBEDDING_DIM: 512
+  KERNEL_SIZE: 9
+  CONV_CHANNELS: 512
+  DROPOUT: 0.11914524644085248
+  DROPOUT_MLP: 0.0
+  INPUT_CHANNELS: 12
+  HIDDEN_DIM: 64
+  LEARNING_RATE: 0.006214187437828991  # Conservative starting point for large batches
+  BATCH_SIZE: 12768  # H100-optimized: 80GB memory allows huge batches
+  NUM_EPOCHS: 500  # Reduced: large batches converge faster
+  K_FOLDS: 5
+  NUM_WORKERS: 0  # Set to 0 for GPU training (data already on GPU)
+  PIN_MEMORY: false  # Not needed when data is on GPU
+  DEVICE: "cuda"
+
+OPTUNA:
+  ENABLED: true  # Enable for augmentation experiment
+  SHOW_PROGRESS_BAR: true
+  N_TRIALS: 50  # More trials for joint optimization (augmentation + model)
+  STUDY_NAME: "augmentation_optimization_v5"
+  STORAGE_URL: "sqlite:///optuna_studies/exp_augmentation_study_v5.db"
+  FIGURES_DIR: "reports/optuna/figures_v5"
+  STUDY_DIR: "reports/optuna/studys_v5"
+  BEST_CONFIG_DIR: "reports/optuna/best_config_v5"
+  RANGES:
+    LEARNING_RATE: [1e-5, 1e-2] # low, high
+    DROPOUT: [0.0, 0.7] # low, high
+    DROPOUT_MLP: [0.0, 0.7] # low, high
+    CONV_CHANNELS: [128, 256, 512]
+    HIDDEN_DIM: [16, 32, 64, 128]
+    KERNEL_SIZE: [3, 5, 7, 9]
+    BATCH_SIZE: [2048, 4096, 8192]  # H100-optimized: leverage massive memory & compute

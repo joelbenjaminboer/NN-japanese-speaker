@@ -16,17 +16,53 @@ classifiers = [
     
 ]
 requires-python = "~=3.11.5"
+dependencies = [
+    "basedpyright>=1.31.7",
+    "einops>=0.8.1",
+    "joblib>=1.5.2",
+    "kaleido>=1.1.0",
+    "matplotlib>=3.10.7",
+    "mypy>=1.18.2",
+    "nomic>=3.6.0",
+    "numpy<2",
+    "onnx>=1.19.1",
+    "optuna>=4.5.0",
+    "optuna-dashboard>=0.19.0",
+    "plotly>=6.3.1",
+    "pre-commit>=4.3.0",
+    "pytest>=8.4.2",
+    "pyyaml>=6.0.3",
+    "ruff>=0.14.1",
+    "scikit-learn>=1.7.2",
+    "seaborn>=0.13.2",
+    "sentence-transformers>=5.1.2",
+    "torch==2.2.0",
+    "torchvision==0.17.0",
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu121"
+url = "https://download.pytorch.org/whl/cu121"
+explicit = true
+
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-cu121", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
+torchvision = [
+  { index = "pytorch-cu121", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
 
 
 [tool.ruff]
 line-length = 99
-src = ["japanese_speaker_recognition"]
-include = ["pyproject.toml", "japanese_speaker_recognition/**/*.py"]
+src = ["src"]
+include = ["pyproject.toml", "src/**/*.py"]
 
 [tool.ruff.lint]
 extend-select = ["I"]  # Add import sorting
 
 [tool.ruff.lint.isort]
-known-first-party = ["japanese_speaker_recognition"]
+known-first-party = ["src"]
 force-sort-within-sections = true
 

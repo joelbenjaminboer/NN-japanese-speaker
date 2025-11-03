@@ -1,5 +1,11 @@
 # Data
-/data/
+/data**
+!data/.gitkeep
+!data/**/.gitkeep
+reports/optuna/
+!reports/optuna/**/.gitkeep
+/habrok_outputs/**
+habrok_outputs_v2/
 
 # Mac OS-specific storage files
 .DS_Store
@@ -110,7 +116,7 @@ ipython_config.py
 #   Similar to Pipfile.lock, it is generally recommended to include uv.lock in version control.
 #   This is especially recommended for binary packages to ensure reproducibility, and is more
 #   commonly ignored for libraries.
-#uv.lock
+uv.lock
 
 # poetry
 #   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
@@ -189,3 +195,10 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# VS Code settings
+.vscode/settings.json
+
+# Basedpyright tings
+typings/
+
