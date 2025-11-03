@@ -37,6 +37,7 @@ class OptunaTuner:
         """requires only the ranges part of the yaml config"""
         learning_rate_raw: list[float] = optuna_ranges.learning_rate
         dropout_raw: list[float] = optuna_ranges.dropout
+        dropout_raw_mlp: list[float] = optuna_ranges.dropout_mlp
         conv_channels: list[int] = optuna_ranges.conv_channels
         hidden_dim: list[int] = optuna_ranges.hidden_dim
         kernel_size: list[int] = optuna_ranges.kernel_size
@@ -47,10 +48,12 @@ class OptunaTuner:
             float(learning_rate_raw[0]), float(learning_rate_raw[1])
             )
         dropout: tuple[float, float] = (float(dropout_raw[0]), float(dropout_raw[1]))
+        dropout_mlp: tuple[float, float] = (float(dropout_raw_mlp[0]), float(dropout_raw_mlp[1]))
 
         return {
             "LEARNING_RATE": learning_rate,
             "DROPOUT": dropout,
+            "DROPOUT_MLP": dropout_mlp,
             "CONV_CHANNELS": conv_channels,
             "HIDDEN_DIM": hidden_dim,
             "KERNEL_SIZE": kernel_size,
@@ -68,6 +71,9 @@ class OptunaTuner:
 
         dropout_low: float = suggested_params["DROPOUT"][0]
         dropout_high: float = suggested_params["DROPOUT"][1]
+        
+        dropout_mlp_low: float = suggested_params["DROPOUT_MLP"][0]
+        dropout_mlp_high: float = suggested_params["DROPOUT_MLP"][1]
 
         return {
             "LEARNING_RATE": trial.suggest_float(
@@ -75,6 +81,9 @@ class OptunaTuner:
             ),
             "DROPOUT": trial.suggest_float(
                 "DROPOUT", dropout_low, dropout_high
+            ),
+            "DROPOUT_MLP": trial.suggest_float(
+                "DROPOUT_MLP", dropout_mlp_low, dropout_mlp_high
             ),
             "CONV_CHANNELS": trial.suggest_categorical(
                 "CONV_CHANNELS", suggested_params["CONV_CHANNELS"]
@@ -194,9 +203,6 @@ class OptunaTuner:
                         "check_same_thread": False,
                         "isolation_level": None,  # Autocommit mode
                     },
-                    "pool_pre_ping": True,  # Verify connections before using
-                    "pool_size": 1,  # Single connection per worker
-                    "max_overflow": 0,  # No overflow connections
                 },
             )
         else:

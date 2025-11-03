@@ -154,6 +154,10 @@ class OutputDirs:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "OutputDirs":
         """Create OutputDirs from dictionary."""
+        for key, value in data.items():
+            path = Path(value)
+            path.mkdir(parents=True, exist_ok=True)
+            
         return cls(
             processed_file_dir=Path(data['PROCESSED']),
             figures_dir=Path(data['FIGURES']),

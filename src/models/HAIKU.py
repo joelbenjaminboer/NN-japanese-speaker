@@ -61,6 +61,7 @@ class HAIKU(nn.Module):
         super().__init__()
         self.embedding_dim: int = embedding_dim
         self.device: str = self._get_device(device)
+        temp = dropout_mlp
 
         # Single convolutional layer
         padding = kernel_size // 2
@@ -125,6 +126,7 @@ class HAIKU(nn.Module):
         """
         return cls(
             dropout=model_cfg.dropout,
+            dropout_mlp=model_cfg.dropout_mlp,
             embedding_dim=model_cfg.embedding_dim,
             kernel_size=model_cfg.kernel_size,
             conv_channels=model_cfg.conv_channels,
@@ -582,3 +584,4 @@ class HAIKU(nn.Module):
         print(f"  Final Output:  {accuracies[3]:.2f}%")
         
         plt.close()
+        
